@@ -45,7 +45,7 @@ export function createApp(config) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const config = loadConfig(CONFIG_PATH);
-  createApp(config).listen(PORT, () => {
+  createApp(config).listen(PORT, '127.0.0.1', () => {
     console.log(`custom-dictionary-splitter running at http://localhost:${PORT}`);
   });
 }

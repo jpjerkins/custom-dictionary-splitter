@@ -64,13 +64,14 @@ export default function RetryTable({ rows: initialRows }: { rows: RetryRow[] }) 
       const response = await fetch('/api/dictionaries');
       if (!response.ok) return;
       const { files, index } = await response.json();
-      setState((prev) => ({
-        ...prev,
-        dictionaryIndex: index,
-        fileHashes: Object.fromEntries(
-          Object.entries(files as Record<string, { hash: string }>).map(([name, info]) => [name, info.hash])
-        ),
-      }));
+      // Computed before setState, not inside its updater — see SortTable.tsx's
+      // refreshDictionaries for why a malformed response must throw here,
+      // synchronously inside this try, rather than during React's own
+      // state-processing pass.
+      const fileHashes = Object.fromEntries(
+        Object.entries(files as Record<string, { hash: string }>).map(([name, info]) => [name, info.hash])
+      );
+      setState((prev) => ({ ...prev, dictionaryIndex: index, fileHashes }));
     } catch {
       // Leave the previous hashes in place; the next save will report them as stale.
     }

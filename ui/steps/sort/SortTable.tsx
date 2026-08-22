@@ -283,6 +283,20 @@ export default function SortTable({
       return;
     }
 
+    // /api/move-word doesn't trust the `fromFile` it was sent — it
+    // rediscovers every non-protected file that actually holds the word and
+    // writes all of them (see src/application/moveWord.ts). `fromFiles` here
+    // is the full set of files this group's `existingChords` already showed
+    // the word living in (that's what built the split prompt), so filtering
+    // out protectedFiles reproduces the same write set client-side without
+    // a backend response change.
+    await refreshDictionaries();
+    const touchedByMove = [toFile, ...fromFiles.filter((f) => !protectedFiles.includes(f))];
+    setState((prev) => ({
+      ...prev,
+      touchedFiles: Array.from(new Set([...(prev.touchedFiles as string[]), ...touchedByMove])),
+    }));
+
     const leftKeys = new Set((result.left ?? []).map((c) => `${c.stroke}::${c.file}`));
     setGroups((prev) =>
       prev.map((group) =>
@@ -348,6 +362,30 @@ export default function SortTable({
     );
   }
 
+  // Refresh dictionary hashes regardless of outcome — a second write with
+  // stale hashes would otherwise be rejected even after this one succeeded.
+  // Shared by handleSave and handleMoveAll: a Move writes through a
+  // different endpoint (/api/move-word) but leaves the same stale-hash trap
+  // behind for the next Save if the caller forgets this.
+  async function refreshDictionaries() {
+    try {
+      const dictResponse = await fetch('/api/dictionaries');
+      if (!dictResponse.ok) return;
+      const { files, index } = await dictResponse.json();
+      // Computed BEFORE setState, not inside its updater: React runs a
+      // functional updater during its own state-processing pass, outside
+      // this try's synchronous scope, so a malformed response (e.g. no
+      // `files` key) would otherwise throw uncaught instead of being
+      // swallowed below.
+      const fileHashes = Object.fromEntries(
+        Object.entries(files as Record<string, { hash: string }>).map(([name, info]) => [name, info.hash])
+      );
+      setState((prev) => ({ ...prev, dictionaryIndex: index, fileHashes }));
+    } catch {
+      // Leave the previous hashes in place; the next write will report them as stale.
+    }
+  }
+
   async function handleSave() {
     const fileHashes = (state.fileHashes as Record<string, string> | null) ?? {};
     const { decisions, noOpKeys } = buildDecisions(groups, priority, protectedFiles, fileHashes);
@@ -386,23 +424,7 @@ export default function SortTable({
       results: { stroke: string; status: string; reason?: string }[];
     };
 
-    // Refresh dictionary hashes regardless of outcome — a second save with
-    // stale hashes would otherwise be rejected even after this one succeeded.
-    try {
-      const dictResponse = await fetch('/api/dictionaries');
-      if (dictResponse.ok) {
-        const { files, index } = await dictResponse.json();
-        setState((prev) => ({
-          ...prev,
-          dictionaryIndex: index,
-          fileHashes: Object.fromEntries(
-            Object.entries(files as Record<string, { hash: string }>).map(([name, info]) => [name, info.hash])
-          ),
-        }));
-      }
-    } catch {
-      // Leave the previous hashes in place; the next save will report them as stale.
-    }
+    await refreshDictionaries();
 
     const succeededKeys = new Set(noOpKeys);
     const failedReasons = new Map<string, string>();

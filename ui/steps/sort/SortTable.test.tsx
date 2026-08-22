@@ -491,5 +491,93 @@ describe('SortTable', () => {
       expect(screen.getByRole('button', { name: 'Move all' })).toBeInTheDocument();
       expect(miscRadio.checked).toBe(false);
     });
+
+    test('a successful move refreshes hashes so a subsequent Save is not rejected as stale', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
+        if (url === '/api/move-word') {
+          return { ok: true, json: async () => ({ status: 'ok' }) };
+        }
+        if (url === '/api/dictionaries') {
+          return {
+            ok: true,
+            json: async () => ({
+              files: { '1-personal.json': { hash: 'h1-fresh' }, '9-misc.json': { hash: 'h2-fresh' } },
+              index: {},
+            }),
+          };
+        }
+        if (url === '/api/save') {
+          return { ok: true, json: async () => ({ results: [{ stroke: 'K-AT', status: 'written' }] }) };
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+
+      renderSortTable({ groups: splitGroups }, { fileHashes: { '1-personal.json': 'h1', '9-misc.json': 'h2' } });
+
+      const miscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(miscRadio);
+      fireEvent.click(screen.getByRole('button', { name: 'Move all' }));
+
+      // Wait for the move to fully land (the radio only flips once
+      // handleMoveAll's setGroups runs, which is after refreshDictionaries).
+      await waitFor(() => expect(miscRadio.checked).toBe(true));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/save', expect.anything()));
+
+      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls.find(([url]) => url === '/api/save')!;
+      const body = JSON.parse((init as RequestInit).body as string);
+      // The pre-move seeded hash was 'h2' — if the move hadn't refreshed
+      // fileHashes, this decision would still carry that stale value.
+      expect(body.decisions[0].capturedHash).toBe('h2-fresh');
+      expect(body.decisions[0].capturedHash).not.toBe('h2');
+    });
+
+    test('a successful move adds both the destination and the source file to touchedFiles', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockImplementation(async (url: string) => {
+        if (url === '/api/move-word') {
+          return { ok: true, json: async () => ({ status: 'ok' }) };
+        }
+        if (url === '/api/dictionaries') {
+          return {
+            ok: true,
+            json: async () => ({
+              files: { '1-personal.json': { hash: 'h1-fresh' }, '9-misc.json': { hash: 'h2-fresh' } },
+              index: {},
+            }),
+          };
+        }
+        throw new Error(`unexpected fetch: ${url}`);
+      });
+
+      function TouchedFilesProbe() {
+        const { state } = useWizard();
+        return <div data-testid="touched-files">{JSON.stringify(state.touchedFiles)}</div>;
+      }
+
+      render(
+        <WizardProvider>
+          <TouchedFilesProbe />
+          <SortTable groups={splitGroups} priority={priority} protectedFiles={protectedFiles} />
+        </WizardProvider>
+      );
+
+      const miscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(miscRadio);
+      fireEvent.click(screen.getByRole('button', { name: 'Move all' }));
+
+      // Asserts what Step 7 would actually POST to /api/commit as `files` —
+      // both the destination the word moved to and the source it moved out
+      // of, so `git add -- <files>` stages the deletion, not just the add.
+      await waitFor(() => {
+        const touchedFiles = JSON.parse(screen.getByTestId('touched-files').textContent!);
+        expect(touchedFiles).toEqual(expect.arrayContaining(['9-misc.json', '1-personal.json']));
+      });
+    });
   });
 });

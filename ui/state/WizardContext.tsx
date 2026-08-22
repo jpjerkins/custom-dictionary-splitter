@@ -9,6 +9,13 @@ export type StepName = (typeof STEP_NAMES)[number];
 // (`groups`, `priority`) the new wizard steps need.
 export interface WizardState {
   port: unknown;
+  // Step 1's raw `list_dictionaries` reply, verbatim — including names that
+  // are not files on disk (e.g. 'user_dictionary', 'jeff-numbers'). Threaded
+  // through to POST /api/classify as `deviceOrder` so the backend can warn
+  // when the firmware's dictionary order doesn't match what's on disk; the
+  // domain functions filter non-file entries themselves, so stripping them
+  // here would break that comparison.
+  deviceOrder: string[] | null;
   downloadedDictionary: unknown;
   dictionaryIndex: unknown;
   fileHashes: unknown;
@@ -22,6 +29,7 @@ export interface WizardState {
 
 const initialState: WizardState = {
   port: null,
+  deviceOrder: null,
   downloadedDictionary: null,
   dictionaryIndex: null,
   fileHashes: null,

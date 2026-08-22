@@ -26,7 +26,7 @@ export default function Step1Connect() {
       } catch (err) {
         console.warn('Failed to close serial port', err);
       }
-      setState((prev) => ({ ...prev, port: null, downloadedDictionary }));
+      setState((prev) => ({ ...prev, port: null, downloadedDictionary, deviceOrder: names }));
       goToStep('diff');
     } catch (err) {
       setStatus(`Error: ${(err as Error).message}`);

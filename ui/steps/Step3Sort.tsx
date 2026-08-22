@@ -64,7 +64,10 @@ function ClassifySort() {
           fetch('/api/classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ downloaded: state.downloadedDictionary }),
+            body: JSON.stringify({
+              downloaded: state.downloadedDictionary,
+              deviceOrder: state.deviceOrder ?? undefined,
+            }),
           }),
         ]);
 

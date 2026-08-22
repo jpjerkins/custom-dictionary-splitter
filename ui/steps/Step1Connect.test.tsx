@@ -22,6 +22,7 @@ function CurrentStepProbe() {
     <div>
       <span data-testid="current-step">{currentStep}</span>
       <span data-testid="port">{state.port === null ? 'null' : 'set'}</span>
+      <span data-testid="device-order">{JSON.stringify(state.deviceOrder)}</span>
     </div>
   );
 }
@@ -59,6 +60,29 @@ describe('Step1Connect', () => {
     expect(close).toHaveBeenCalledTimes(1);
     expect(screen.getByTestId('port').textContent).toBe('null');
     expect(downloadUserDictionary).toHaveBeenCalledWith(fakePort, 'user_dictionary');
+  });
+
+  test('stores the device dictionary list verbatim as deviceOrder, for POST /api/classify to consume', async () => {
+    connectToKeyboard.mockResolvedValue(fakePort);
+    // Includes a name that is not a file on disk — must be stored as-is,
+    // not filtered, since the domain functions do that filtering themselves.
+    listDictionaries.mockResolvedValue(['6-main.json', '1-personal.json', 'user_dictionary']);
+    downloadUserDictionary.mockResolvedValue({});
+
+    render(
+      <WizardProvider>
+        <Step1Connect />
+        <CurrentStepProbe />
+      </WizardProvider>,
+    );
+
+    fireEvent.click(screen.getByText('Connect keyboard'));
+
+    await waitFor(() =>
+      expect(screen.getByTestId('device-order').textContent).toBe(
+        JSON.stringify(['6-main.json', '1-personal.json', 'user_dictionary']),
+      ),
+    );
   });
 
   test('falls back to the last dictionary when no candidate name matches', async () => {

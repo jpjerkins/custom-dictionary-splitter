@@ -230,6 +230,21 @@ select {
   background: var(--color-row-hover);
 }
 
+/* Pass/fail/pending status cells, used by the Step 6 test checklist. */
+.status-pass {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+.status-fail {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.status-pending {
+  color: var(--color-text-faint);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .btn,
   .entry-table tbody tr {

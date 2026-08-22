@@ -29,6 +29,8 @@ function buildRetryRows(failedChecklistRows) {
       destinationFile: moved ? moved.destinationFile : Object.keys(state.fileHashes)[0],
       conflict: false,
       retry: true,
+      wasConflict: moved ? Boolean(moved.wasConflict) : false,
+      existingTranslation: moved ? moved.existingTranslation : undefined,
     };
   });
 }
@@ -104,7 +106,9 @@ function renderRows(tbody, rows, onDrop) {
       const dropTd = document.createElement('td');
       const dropButton = document.createElement('button');
       dropButton.type = 'button';
-      dropButton.textContent = 'Drop';
+      // A retry row that started as a conflict already had a value in the dictionary;
+      // dropping it restores that value instead of deleting the stroke outright.
+      dropButton.textContent = row.wasConflict && row.existingTranslation !== undefined ? 'Restore prior value' : 'Drop';
       dropButton.addEventListener('click', () => onDrop(row));
       dropTd.appendChild(dropButton);
       tr.appendChild(dropTd);
@@ -148,21 +152,31 @@ export function initStep3() {
   }
 
   async function dropRow(row) {
-    statusEl.textContent = `Dropping ${row.stroke}...`;
-    const results = await postDecisions([
-      {
-        stroke: row.stroke,
-        destinationFile: row.destinationFile,
-        capturedHash: state.fileHashes[row.destinationFile],
-        remove: true,
-      },
-    ]);
+    // A row that started life as a Step 2 conflict already had a translation in the
+    // dictionary before this session touched it — dropping it must restore that
+    // translation, not delete the stroke, or the pre-existing entry is lost for good.
+    const isRestore = row.wasConflict && row.existingTranslation !== undefined;
+    statusEl.textContent = isRestore ? `Restoring ${row.stroke}...` : `Dropping ${row.stroke}...`;
+    const decision = isRestore
+      ? {
+          stroke: row.stroke,
+          translation: row.existingTranslation,
+          destinationFile: row.destinationFile,
+          capturedHash: state.fileHashes[row.destinationFile],
+        }
+      : {
+          stroke: row.stroke,
+          destinationFile: row.destinationFile,
+          capturedHash: state.fileHashes[row.destinationFile],
+          remove: true,
+        };
+    const results = await postDecisions([decision]);
     await refreshDictionaries();
     if (!results) return;
 
     const result = results[0];
-    if (result.status !== 'removed') {
-      statusEl.textContent = `Could not drop ${row.stroke}: ${result.reason}`;
+    if (result.status === 'stale' || result.status === 'error') {
+      statusEl.textContent = `Could not ${isRestore ? 'restore' : 'drop'} ${row.stroke}: ${result.reason}`;
       return;
     }
 
@@ -171,7 +185,7 @@ export function initStep3() {
     state.checklist = state.checklist.filter((r) => r.stroke !== row.stroke);
     rows = rows.filter((r) => r !== row);
     renderRows(tbody, rows, dropRow);
-    statusEl.textContent = `Dropped ${row.stroke}.`;
+    statusEl.textContent = isRestore ? `Restored ${row.stroke} to its prior value.` : `Dropped ${row.stroke}.`;
   }
 
   document.getElementById('step-sort').addEventListener('wizard:enter', () => {
@@ -216,6 +230,8 @@ export function initStep3() {
         stroke: row.stroke,
         translation: row.translation,
         destinationFile: row.destinationFile,
+        wasConflict: row.conflict || Boolean(row.wasConflict),
+        existingTranslation: row.existingTranslation,
       });
       markTouched(row.destinationFile);
       state.checklist = state.checklist.filter((r) => r.stroke !== row.stroke);

@@ -22,3 +22,24 @@ test('device order mismatch is detected, ignoring files the disk does not have',
   // device lists non-file dictionaries too; they are ignored
   assert.equal(deviceOrderMismatch(['1-a.json'], ['user_dictionary', '1-a.json']), false);
 });
+
+test('a reorder is still detected when the device also reports unknown dictionaries', () => {
+  assert.equal(
+    deviceOrderMismatch(['1-a.json', '2-b.json'], ['2-b.json', '1-a.json', 'extra.json']),
+    true,
+  );
+});
+
+test('the real device list shape: unknown leading entries do not mask a reorder', () => {
+  const onDisk = ['1-bible.json', '2-phil-mro.json', '6-main.json'];
+  // device reports two dictionaries that are not files, then the files IN ORDER
+  assert.equal(
+    deviceOrderMismatch(onDisk, ['user_dictionary', 'jeff-numbers', ...onDisk]),
+    false,
+  );
+  // same padding, but 6-main flashed ahead of 2-phil-mro
+  assert.equal(
+    deviceOrderMismatch(onDisk, ['user_dictionary', 'jeff-numbers', '1-bible.json', '6-main.json', '2-phil-mro.json']),
+    true,
+  );
+});

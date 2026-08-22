@@ -107,14 +107,25 @@ pre-existing entry gets lost by accident.
 ```json
 {
   "dictionariesPath": "/Users/phil/dev/steno-dictionaries",
-  "protectedFiles": ["6-main.json"]
+  "protectedFiles": ["6-main.json", "7-commands.json"]
 }
 ```
 
-Protected files are read-only baselines. The app never writes to them: they
-are excluded as destinations, excluded from case-2 presetting, and
+Both are stock, out-of-the-box dictionaries sitting at their original
+priorities. Protected files are read-only baselines. The app never writes to
+them: they are excluded as destinations, excluded from case-2 presetting, and
 "keep keyboard word" is disabled for conflicts against them. Nothing is
 protected unless listed.
+
+In the Step 3 radio grid, protected files render as disabled columns with
+their headers marked, so it is visible at a glance that they are baselines
+rather than destinations that happen to be unselected.
+
+Note that `7-commands.json` sits at the **bottom** of the priority order, so
+any file outranks it — an override against a commands entry can target
+anywhere. It is also already shadowed by `6-main.json` wherever the two
+define the same stroke, which is stock behavior and not something this app
+changes.
 
 ## Priority-aware indexing
 
@@ -255,6 +266,6 @@ Ordered so the app stays working throughout:
 
 ## Open questions
 
-- Whether `7-commands.json` sitting **below** `6-main.json` in the device
-  order is intentional. If not, entries in `commands` are currently shadowed
-  by main. Noted during design; not resolved, and not blocking.
+None outstanding. The one raised during design — whether `7-commands.json`
+sitting below `6-main.json` was intentional — is resolved: it is a stock
+dictionary at its original priority, and is protected alongside `main`.

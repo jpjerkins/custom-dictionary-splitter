@@ -4,6 +4,8 @@ import { createGitAdapter } from '../src/infrastructure/gitAdapter.ts';
 import { createLoadDictionariesUseCase } from '../src/application/loadDictionaries.ts';
 import { createSaveDecisionsUseCase } from '../src/application/saveDecisions.ts';
 import { createCommitAndPushUseCase } from '../src/application/commitAndPush.ts';
+import { createClassifyDownloadedUseCase } from '../src/application/classifyDownloaded.ts';
+import { createMoveWordUseCase } from '../src/application/moveWord.ts';
 import type { AppConfig } from '../src/infrastructure/configProvider.ts';
 
 function readBody(req: IncomingMessage): Promise<any> {
@@ -36,11 +38,27 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     if (req.method === 'GET' && req.url === '/api/dictionaries') {
       const repository = createFsDictionaryRepository(config.dictionariesPath);
       const useCase = createLoadDictionariesUseCase({ repository });
-      const { files, index } = useCase.execute();
+      const { files, index, priority } = useCase.execute();
       const legacyIndex = Object.fromEntries(
         Array.from(index, ([stroke, entry]) => [stroke, { file: entry.winner.file, translation: entry.winner.word }])
       );
-      sendJson(res, 200, { files, index: legacyIndex });
+      sendJson(res, 200, { files, index: legacyIndex, priority, protectedFiles: config.protectedFiles });
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/classify') {
+      const { downloaded, deviceOrder } = await readBody(req);
+      const repository = createFsDictionaryRepository(config.dictionariesPath);
+      const useCase = createClassifyDownloadedUseCase({ repository, protectedFiles: config.protectedFiles });
+      sendJson(res, 200, useCase.execute({ downloaded, deviceOrder }));
+      return;
+    }
+
+    if (req.method === 'POST' && req.url === '/api/move-word') {
+      const { word, fromFile, toFile, capturedHashes } = await readBody(req);
+      const repository = createFsDictionaryRepository(config.dictionariesPath);
+      const useCase = createMoveWordUseCase({ repository, protectedFiles: config.protectedFiles });
+      sendJson(res, 200, useCase.execute({ word, fromFile, toFile, capturedHashes }));
       return;
     }
 

@@ -10,6 +10,7 @@ export interface LoadDictionariesDeps {
 export interface LoadDictionariesResult {
   files: Record<FileName, { hash: string }>;
   index: Map<Stroke, StrokeIndexEntry>;
+  priority: FileName[];
 }
 
 export function createLoadDictionariesUseCase({ repository }: LoadDictionariesDeps) {
@@ -21,7 +22,7 @@ export function createLoadDictionariesUseCase({ repository }: LoadDictionariesDe
       const fileSummaries = Object.fromEntries(
         Object.entries(files).map(([name, info]) => [name, { hash: info.hash }])
       );
-      return { files: fileSummaries, index };
+      return { files: fileSummaries, index, priority: priority.files };
     },
   };
 }

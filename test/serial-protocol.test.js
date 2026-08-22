@@ -12,8 +12,35 @@ test('createResponseAccumulator waits for a blank-line terminator across chunks'
   assert.equal(accumulator.tryExtractResponse(), 'KAT: cat\nTKOG: dog');
 });
 
-test('parseDictionaryList splits and trims lines', () => {
-  assert.deepEqual(parseDictionaryList('user_dictionary\nmain_dictionary\n'), ['user_dictionary', 'main_dictionary']);
+test('parseDictionaryList reads the bracketed record list the firmware emits', () => {
+  // Captured verbatim from a Starboard running Javelin.
+  const response = [
+    '[',
+    '{d: user_dictionary},',
+    '{d: jeff-numbers},',
+    '{d: 1-bible.json},',
+    '{d: 7-commands.json}',
+    ']',
+  ].join('\n');
+
+  assert.deepEqual(parseDictionaryList(response), [
+    'user_dictionary',
+    'jeff-numbers',
+    '1-bible.json',
+    '7-commands.json',
+  ]);
+});
+
+test('parseDictionaryList includes disabled dictionaries', () => {
+  assert.deepEqual(parseDictionaryList('[\n{d: on.json},\n{d: off.json,v: 0}\n]'), ['on.json', 'off.json']);
+});
+
+test('parseDictionaryList unquotes names that were not YAML-safe', () => {
+  assert.deepEqual(parseDictionaryList('[\n{d: "a b: c"}\n]'), ['a b: c']);
+});
+
+test('parseDictionaryList returns nothing for an empty list', () => {
+  assert.deepEqual(parseDictionaryList('[\n]'), []);
 });
 
 test('parseDictionaryJson parses valid JSON and throws on malformed input', () => {

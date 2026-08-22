@@ -14,11 +14,17 @@ export function createResponseAccumulator() {
   };
 }
 
+// The firmware prints one `{d: name}` record per line, `{d: name,v: 0}` when the
+// dictionary is disabled, wrapped in `[`/`]`. Names are bare unless they need
+// escaping, in which case they arrive JSON-quoted.
+const DICTIONARY_RECORD = /^\{d:\s*(.*?)(?:,v:\s*\d+)?\},?$/;
+
 export function parseDictionaryList(responseText) {
   return responseText
     .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean);
+    .map((line) => DICTIONARY_RECORD.exec(line.trim()))
+    .filter(Boolean)
+    .map(([, name]) => (name.startsWith('"') ? JSON.parse(name) : name));
 }
 
 export function parseDictionaryJson(responseText) {

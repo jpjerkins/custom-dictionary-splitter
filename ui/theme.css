@@ -1,0 +1,249 @@
+/*
+ * Theme tokens for the dictionary-splitter wizard UI.
+ *
+ * Light palette lives on :root. Dark mode redefines ONLY the token
+ * values (never adds new tokens) under prefers-color-scheme: dark.
+ * Components must always read a var(--token) — never a literal color.
+ */
+
+:root {
+  /* Surfaces */
+  --color-bg: #f5f6f8;
+  --color-surface: #ffffff;
+  --color-surface-alt: #eceef2;
+  --color-surface-raised: #ffffff;
+
+  /* Borders / dividers */
+  --color-border: #d6dae1;
+  --color-border-strong: #b9bfc9;
+
+  /* Text */
+  --color-text: #1b1f27;
+  --color-text-muted: #5b6270;
+  --color-text-faint: #8a909c;
+  --color-text-on-accent: #ffffff;
+
+  /* Brand / accent */
+  --color-accent: #2f6fed;
+  --color-accent-hover: #2559c4;
+  --color-accent-muted: #dbe6ff;
+
+  /* Status */
+  --color-success: #1f9254;
+  --color-success-muted: #dcf3e7;
+  --color-warning: #b9770e;
+  --color-warning-muted: #fbecd2;
+  --color-danger: #d13c3c;
+  --color-danger-muted: #fbdede;
+
+  /* Table row striping (dense entry tables) */
+  --color-row-alt: #f7f8fa;
+  --color-row-hover: #eef2fb;
+
+  /* Focus ring */
+  --color-focus-ring: #2f6fed;
+
+  /* Shadows */
+  --shadow-elevated: 0 4px 12px rgba(20, 24, 32, 0.08);
+
+  /* Type / spacing */
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-size-sm: 0.8125rem;
+  --font-size-base: 0.9375rem;
+  --font-size-lg: 1.125rem;
+  --line-height-dense: 1.35;
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Surfaces */
+    --color-bg: #14161c;
+    --color-surface: #1c1f27;
+    --color-surface-alt: #242833;
+    --color-surface-raised: #262a35;
+
+    /* Borders / dividers */
+    --color-border: #343a48;
+    --color-border-strong: #454c5e;
+
+    /* Text */
+    --color-text: #e8eaf0;
+    --color-text-muted: #a5abba;
+    --color-text-faint: #767d8d;
+    --color-text-on-accent: #ffffff;
+
+    /* Brand / accent — lifted brightness/saturation to read on dark */
+    --color-accent: #6f9bff;
+    --color-accent-hover: #8caeff;
+    --color-accent-muted: #26325a;
+
+    /* Status */
+    --color-success: #4fd08a;
+    --color-success-muted: #163826;
+    --color-warning: #f0b74f;
+    --color-warning-muted: #3d2f10;
+    --color-danger: #f47272;
+    --color-danger-muted: #3d1c1c;
+
+    /* Table row striping */
+    --color-row-alt: #20232c;
+    --color-row-hover: #262c3d;
+
+    /* Focus ring */
+    --color-focus-ring: #8caeff;
+
+    /* Shadows */
+    --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.45);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-dense);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--color-text);
+}
+
+a {
+  color: var(--color-accent);
+}
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: var(--color-text);
+}
+
+/* Utility classes used by the sample shell in App.tsx and, later,
+   the dense entry table. */
+
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  box-shadow: var(--shadow-elevated);
+}
+
+.text-muted {
+  color: var(--color-text-muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-base);
+  cursor: pointer;
+}
+
+.btn:hover {
+  background: var(--color-accent-hover);
+}
+
+.btn-secondary {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+}
+
+.btn-secondary:hover {
+  background: var(--color-surface);
+}
+
+.badge {
+  display: inline-block;
+  font-size: var(--font-size-sm);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--color-success-muted);
+  color: var(--color-success);
+}
+
+/* Dense entry table: tabular numerals keep stroke/word counts aligned,
+   compact vertical rhythm keeps many rows legible. */
+.entry-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+
+.entry-table th,
+.entry-table td {
+  text-align: left;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+  font-variant-numeric: tabular-nums;
+}
+
+.entry-table th {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.entry-table tbody tr:nth-child(even) {
+  background: var(--color-row-alt);
+}
+
+.entry-table tbody tr:hover {
+  background: var(--color-row-hover);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .btn,
+  .entry-table tbody tr {
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

@@ -1,6 +1,7 @@
 // Local mirror of src/domain/grouping.ts + src/domain/classification.ts shapes.
 // ui/ talks to the backend over HTTP only (never imports src/domain|application|
 // infrastructure), so the wire shape is redeclared here rather than shared.
+import type { ResolutionChoice } from '../../resolutions.ts';
 
 export type CaseKind = 'new' | 'chord-taken' | 'word-exists' | 'both' | 'unchanged';
 
@@ -15,7 +16,7 @@ export interface NewChord {
   kind: CaseKind;
   diskWord?: string;
   diskFile?: string;
-  resolution: string | null;
+  resolution: ResolutionChoice | null;
 }
 
 export interface WordGroup {

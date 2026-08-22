@@ -1,5 +1,6 @@
 import ChordRow from './ChordRow.tsx';
 import type { WordGroup } from './types.ts';
+import type { ResolutionChoice } from '../../resolutions.ts';
 
 // Renders one word as N stacked <tr>s (existing on-disk chords first,
 // greyed, then the incoming chords from the keyboard). The word, the radio
@@ -13,10 +14,12 @@ export default function WordGroupRow({
   group,
   priority,
   protectedFiles,
+  onResolveChord,
 }: {
   group: WordGroup;
   priority: string[];
   protectedFiles: string[];
+  onResolveChord: (word: string, stroke: string, resolution: ResolutionChoice | null) => void;
 }) {
   const rows = [
     ...group.existingChords.map((chord) => ({
@@ -31,6 +34,7 @@ export default function WordGroupRow({
       kind: chord.kind,
       diskWord: chord.diskWord,
       diskFile: chord.diskFile,
+      chord,
     })),
   ];
   const rowCount = rows.length;
@@ -40,11 +44,16 @@ export default function WordGroupRow({
       {rows.map((row, i) => (
         <tr key={row.key} className={row.existing ? 'word-group-row word-group-row-existing' : 'word-group-row'}>
           <ChordRow
+            word={group.word}
             stroke={row.stroke}
             existing={row.existing}
             kind={row.existing ? undefined : row.kind}
             diskWord={row.existing ? undefined : row.diskWord}
             diskFile={row.existing ? undefined : row.diskFile}
+            chord={row.existing ? undefined : row.chord}
+            priority={row.existing ? undefined : priority}
+            protectedFiles={row.existing ? undefined : protectedFiles}
+            onResolve={row.existing ? undefined : (resolution) => onResolveChord(group.word, row.stroke, resolution)}
           />
           {i === 0 && (
             <>

@@ -12,6 +12,7 @@ export interface SerialPort {
   writable: WritableStream<Uint8Array>;
   open(options: { baudRate: number }): Promise<void>;
   setSignals(signals: SerialPortSignals): Promise<void>;
+  close(): Promise<void>;
 }
 
 interface Serial {

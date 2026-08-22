@@ -59,6 +59,19 @@ test('POST /api/save writes a new entry', async () => {
   assert.equal(body.results[0].status, 'written');
 });
 
+test('POST /api/save with malformed JSON returns an error without crashing the server', async () => {
+  const response = await fetch(`${baseUrl}/api/save`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{not valid json',
+  });
+
+  assert.equal(response.status, 500);
+
+  const healthResponse = await fetch(`${baseUrl}/api/health`);
+  assert.equal(healthResponse.status, 200);
+});
+
 test('POST /api/commit commits saved changes locally', async () => {
   const response = await fetch(`${baseUrl}/api/commit`, {
     method: 'POST',

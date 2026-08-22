@@ -245,8 +245,130 @@ select {
   color: var(--color-text-faint);
 }
 
+/* Sort step: the word-grouped table of radio columns. Wrapping it in its
+   own overflow-x container keeps the page body from scrolling sideways
+   when there are eight-plus dictionary columns. */
+.sort-table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.sort-table {
+  min-width: max-content;
+}
+
+.sort-table th,
+.sort-table td {
+  vertical-align: middle;
+}
+
+/* Rotated column headers: counter-clockwise so eight-plus dictionary
+   names fit across the screen without truncation. */
+.dict-header {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  padding: var(--space-2) var(--space-1);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.dict-header-label {
+  font-weight: 600;
+}
+
+.dict-header-protected {
+  background: var(--color-surface-alt);
+  color: var(--color-text-faint);
+}
+
+.dict-header-badge {
+  display: inline-block;
+  margin-top: var(--space-1);
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+}
+
+.word-header,
+.chords-header,
+.delete-header {
+  vertical-align: bottom;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+/* One <tr> per chord; existing on-disk chords are visually receded so it's
+   obvious at a glance which strokes are already filed for a word. */
+.word-group-row-existing .chord-cell {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+.chord-cell {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.chord-stroke {
+  font-family: var(--font-mono);
+}
+
+.chord-hint {
+  display: block;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-faint);
+}
+
+.chord-hint-conflict {
+  color: var(--color-warning);
+}
+
+.word-cell {
+  font-weight: 600;
+  border-left: 1px solid var(--color-border);
+}
+
+.radio-cell {
+  text-align: center;
+  border-left: 1px solid var(--color-border);
+}
+
+.radio-cell input[type='radio'] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.radio-cell-protected {
+  background: var(--color-surface-alt);
+}
+
+.radio-cell-protected input[type='radio'] {
+  cursor: not-allowed;
+}
+
+.delete-cell {
+  text-align: center;
+  border-left: 1px solid var(--color-border);
+}
+
+.btn-icon {
+  background: transparent;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-danger);
+  cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  line-height: 1;
+}
+
+.btn-icon:hover {
+  background: var(--color-danger-muted);
+}
+
 @media (prefers-reduced-motion: no-preference) {
   .btn,
+  .btn-icon,
   .entry-table tbody tr {
     transition:
       background-color 120ms ease,

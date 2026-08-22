@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { compareStrokes, isStrokeParseable } from '../domain/stenoOrder.ts';
 import type { DictionaryFile, DictionaryRepository } from '../application/ports.ts';
+import type { ApplyDecision, ApplyResult } from '../application/saveDecisions.ts';
 import type { FileName, Stroke, Word } from '../domain/types.ts';
 
 export function loadDictionaryFiles(dirPath: string): Record<FileName, DictionaryFile> {
@@ -40,26 +41,13 @@ function writeSorted(path: string, entries: Record<Stroke, Word>): void {
   writeFileSync(path, `${JSON.stringify(sortEntries(entries), null, 2)}\n`, 'utf8');
 }
 
-export interface ApplyDecision {
-  stroke: Stroke;
-  translation?: Word;
-  destinationFile: FileName;
-  capturedHash: string;
-  remove?: boolean;
-}
-
-export interface ApplyResult {
-  stroke: Stroke;
-  status: 'written' | 'written-unparseable-appended' | 'removed' | 'stale' | 'error';
-  reason?: string;
-}
-
 export function applyEntries(
   dictionaryFiles: Record<FileName, DictionaryFile>,
-  decisions: ApplyDecision[]
+  decisions: ApplyDecision[],
+  repository: DictionaryRepository
 ): ApplyResult[] {
   const results: ApplyResult[] = [];
-  const byFile = new Map<FileName, { path: string; entries: Record<Stroke, Word> }>();
+  const byFile = new Map<FileName, Record<Stroke, Word>>();
 
   for (const decision of decisions) {
     const fileInfo = dictionaryFiles[decision.destinationFile];
@@ -73,9 +61,9 @@ export function applyEntries(
       continue;
     }
     if (!byFile.has(decision.destinationFile)) {
-      byFile.set(decision.destinationFile, { path: fileInfo.path, entries: { ...fileInfo.entries } });
+      byFile.set(decision.destinationFile, { ...fileInfo.entries });
     }
-    const target = byFile.get(decision.destinationFile)!.entries;
+    const target = byFile.get(decision.destinationFile)!;
     if (decision.remove) {
       delete target[decision.stroke];
       results.push({ stroke: decision.stroke, status: 'removed' });
@@ -88,8 +76,8 @@ export function applyEntries(
     });
   }
 
-  for (const { path, entries } of byFile.values()) {
-    writeSorted(path, entries);
+  for (const [file, entries] of byFile.entries()) {
+    repository.write(file, entries);
   }
 
   return results;

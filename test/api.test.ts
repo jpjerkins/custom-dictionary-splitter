@@ -5,12 +5,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { createApp } from '../server.js';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createApp } from '../server.ts';
 
 const execFileAsync = promisify(execFile);
-let server;
-let baseUrl;
-let dictDir;
+let server: Server;
+let baseUrl: string;
+let dictDir: string;
 
 before(async () => {
   dictDir = await mkdtemp(join(tmpdir(), 'cds-api-'));
@@ -21,10 +23,10 @@ before(async () => {
   await execFileAsync('git', ['add', '-A'], { cwd: dictDir });
   await execFileAsync('git', ['commit', '-m', 'seed'], { cwd: dictDir });
 
-  const config = { dictionariesPath: dictDir, git: { autoPush: false } };
+  const config = { dictionariesPath: dictDir, protectedFiles: [], git: { autoPush: false } };
   server = createApp(config);
-  await new Promise((resolve) => server.listen(0, resolve));
-  baseUrl = `http://localhost:${server.address().port}`;
+  await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+  baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
 });
 
 after(() => {

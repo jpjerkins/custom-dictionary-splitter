@@ -1,14 +1,16 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApp } from '../server.js';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import { createApp } from '../server.ts';
 
-let server;
-let baseUrl;
+let server: Server;
+let baseUrl: string;
 
 before(async () => {
-  server = createApp({ dictionariesPath: process.cwd(), git: { autoPush: false } });
-  await new Promise((resolve) => server.listen(0, resolve));
-  baseUrl = `http://localhost:${server.address().port}`;
+  server = createApp({ dictionariesPath: process.cwd(), protectedFiles: [], git: { autoPush: false } });
+  await new Promise<void>((resolve) => server.listen(0, () => resolve()));
+  baseUrl = `http://localhost:${(server.address() as AddressInfo).port}`;
 });
 
 after(() => {

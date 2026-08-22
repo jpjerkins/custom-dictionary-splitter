@@ -17,6 +17,7 @@ export default function ChordRow({
   priority,
   protectedFiles,
   onResolve,
+  saveError,
 }: {
   word: string;
   stroke: string;
@@ -28,6 +29,7 @@ export default function ChordRow({
   priority?: string[];
   protectedFiles?: string[];
   onResolve?: (resolution: ResolutionChoice | null) => void;
+  saveError?: string;
 }) {
   const isConflict = kind === 'chord-taken' || kind === 'both';
 
@@ -43,6 +45,11 @@ export default function ChordRow({
           protectedFiles={protectedFiles}
           onChange={onResolve}
         />
+      )}
+      {!existing && saveError && (
+        <p className="conflict-error" role="alert">
+          Could not save: {saveError}
+        </p>
       )}
     </td>
   );

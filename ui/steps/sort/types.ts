@@ -17,6 +17,10 @@ export interface NewChord {
   diskWord?: string;
   diskFile?: string;
   resolution: ResolutionChoice | null;
+  // Set after a failed /api/save attempt ('stale' or 'error') so the row
+  // stays on screen with its reason instead of silently disappearing.
+  // Cleared on the next successful save of this chord (it just gets removed).
+  saveError?: string;
 }
 
 export interface WordGroup {

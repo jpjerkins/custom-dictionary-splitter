@@ -4,6 +4,7 @@ import '@testing-library/jest-dom/vitest';
 import ConflictResolver from './ConflictResolver.tsx';
 import SortTable from './SortTable.tsx';
 import type { NewChord, WordGroup } from './types.ts';
+import { WizardProvider } from '../../state/WizardContext.tsx';
 
 afterEach(() => {
   cleanup();
@@ -114,7 +115,11 @@ describe('ConflictResolver', () => {
       },
     ];
 
-    render(<SortTable groups={groups} priority={priority} protectedFiles={protectedFiles} />);
+    render(
+      <WizardProvider>
+        <SortTable groups={groups} priority={priority} protectedFiles={protectedFiles} />
+      </WizardProvider>
+    );
 
     const saveButton = screen.getByRole('button', { name: /save/i });
     expect(saveButton).toBeDisabled();

@@ -10,16 +10,24 @@ import type { ResolutionChoice } from '../../resolutions.ts';
 // name={group.word}, so within one word only one destination file can be
 // selected at a time, and there is exactly one delete button for the
 // whole word, per the user's explicit request.
+//
+// Radio selection is controlled (checked/onChange), not defaultChecked, so
+// picking a destination for a word is recorded by the caller (SortTable)
+// rather than silently living only in the DOM.
 export default function WordGroupRow({
   group,
   priority,
   protectedFiles,
   onResolveChord,
+  onSelectDestination,
+  onDeleteWord,
 }: {
   group: WordGroup;
   priority: string[];
   protectedFiles: string[];
   onResolveChord: (word: string, stroke: string, resolution: ResolutionChoice | null) => void;
+  onSelectDestination: (word: string, file: string) => void;
+  onDeleteWord: (word: string) => void;
 }) {
   const rows = [
     ...group.existingChords.map((chord) => ({
@@ -54,6 +62,7 @@ export default function WordGroupRow({
             priority={row.existing ? undefined : priority}
             protectedFiles={row.existing ? undefined : protectedFiles}
             onResolve={row.existing ? undefined : (resolution) => onResolveChord(group.word, row.stroke, resolution)}
+            saveError={row.existing ? undefined : row.chord?.saveError}
           />
           {i === 0 && (
             <>
@@ -74,13 +83,19 @@ export default function WordGroupRow({
                       aria-label={file}
                       value={file}
                       disabled={isProtected}
-                      defaultChecked={!isProtected && group.destinationFile === file}
+                      checked={!isProtected && group.destinationFile === file}
+                      onChange={() => onSelectDestination(group.word, file)}
                     />
                   </td>
                 );
               })}
               <td className="delete-cell" rowSpan={rowCount}>
-                <button type="button" className="btn-icon" aria-label={`Delete ${group.word}`}>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label={`Delete ${group.word}`}
+                  onClick={() => onDeleteWord(group.word)}
+                >
                   &#x2715;
                 </button>
               </td>

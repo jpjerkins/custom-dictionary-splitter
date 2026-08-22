@@ -1,8 +1,10 @@
+import type { Stroke } from './types.ts';
+
 const KEY_ORDER = 'STKPWHRAO*EUFRPBLGTSDZ';
 
-export function strokeToKeyIndices(stroke) {
+export function strokeToKeyIndices(stroke: Stroke): { indices: number[]; unparseable: boolean } {
   const chars = stroke.replace(/-/g, '').split('');
-  const indices = [];
+  const indices: number[] = [];
   let cursor = 0;
   let unparseable = false;
   for (const ch of chars) {
@@ -18,7 +20,7 @@ export function strokeToKeyIndices(stroke) {
   return { indices, unparseable };
 }
 
-export function compareStrokes(a, b) {
+export function compareStrokes(a: Stroke, b: Stroke): number {
   const strokesA = a.split('/');
   const strokesB = b.split('/');
   const len = Math.max(strokesA.length, strokesB.length);
@@ -37,6 +39,6 @@ export function compareStrokes(a, b) {
   return 0;
 }
 
-export function isStrokeParseable(stroke) {
+export function isStrokeParseable(stroke: Stroke): boolean {
   return stroke.split('/').every((s) => !strokeToKeyIndices(s).unparseable);
 }

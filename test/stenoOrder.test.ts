@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { compareStrokes, isStrokeParseable } from '../lib/stenoOrder.js';
+import { compareStrokes, isStrokeParseable } from '../src/domain/stenoOrder.ts';
 
 test('compareStrokes orders single strokes by canonical key position', () => {
   assert.ok(compareStrokes('S', 'T') < 0);

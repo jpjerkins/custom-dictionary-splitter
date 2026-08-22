@@ -1,6 +1,6 @@
 import { loadDictionaryFiles, buildStrokeIndex } from '../lib/dictionaries.js';
 import { applyEntries } from '../lib/writeEntries.js';
-import { commitAndMaybePush } from '../lib/git.js';
+import { createGitAdapter } from '../src/infrastructure/gitAdapter.ts';
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -49,7 +49,7 @@ export async function handleApiRequest(req, res, config) {
 
     if (req.method === 'POST' && req.url === '/api/commit') {
       const { message, files } = await readBody(req);
-      const result = await commitAndMaybePush(config.dictionariesPath, message, config.git.autoPush, files);
+      const result = await createGitAdapter(config.dictionariesPath).commitAndMaybePush(message, config.git.autoPush, files);
       sendJson(res, 200, result);
       return;
     }

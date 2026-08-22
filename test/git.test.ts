@@ -5,11 +5,11 @@ import { promisify } from 'node:util';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { commitAndMaybePush } from '../lib/git.js';
+import { createGitAdapter } from '../src/infrastructure/gitAdapter.ts';
 
 const execFileAsync = promisify(execFile);
 
-async function initRepo(dir) {
+async function initRepo(dir: string): Promise<void> {
   await execFileAsync('git', ['init'], { cwd: dir });
   await execFileAsync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir });
   await execFileAsync('git', ['config', 'user.name', 'Test'], { cwd: dir });
@@ -20,7 +20,7 @@ test('commitAndMaybePush commits without pushing when autoPush is false', async 
   await initRepo(dir);
   await writeFile(join(dir, 'a.json'), '{}');
 
-  const result = await commitAndMaybePush(dir, 'test commit', false);
+  const result = await createGitAdapter(dir).commitAndMaybePush('test commit', false);
 
   assert.equal(result.committed, true);
   assert.equal(result.pushed, false);
@@ -32,9 +32,10 @@ test('commitAndMaybePush reports nothing to commit when working tree is clean', 
   const dir = await mkdtemp(join(tmpdir(), 'cds-git-'));
   await initRepo(dir);
   await writeFile(join(dir, 'a.json'), '{}');
-  await commitAndMaybePush(dir, 'first commit', false);
+  const git = createGitAdapter(dir);
+  await git.commitAndMaybePush('first commit', false);
 
-  const result = await commitAndMaybePush(dir, 'second commit', false);
+  const result = await git.commitAndMaybePush('second commit', false);
 
   assert.equal(result.committed, false);
 });
@@ -45,7 +46,7 @@ test('commitAndMaybePush stages only the named files when files is given', async
   await writeFile(join(dir, 'a.json'), '{}');
   await writeFile(join(dir, 'unrelated.txt'), 'dirty');
 
-  const result = await commitAndMaybePush(dir, 'targeted commit', false, ['a.json']);
+  const result = await createGitAdapter(dir).commitAndMaybePush('targeted commit', false, ['a.json']);
 
   assert.equal(result.committed, true);
   const { stdout } = await execFileAsync('git', ['show', '--name-only', '--format=', 'HEAD'], { cwd: dir });
@@ -59,7 +60,7 @@ test('commitAndMaybePush reports a push failure instead of throwing', async () =
   await initRepo(dir);
   await writeFile(join(dir, 'a.json'), '{}');
 
-  const result = await commitAndMaybePush(dir, 'unpushable commit', true);
+  const result = await createGitAdapter(dir).commitAndMaybePush('unpushable commit', true);
 
   assert.equal(result.committed, true);
   assert.equal(result.pushed, false);
@@ -81,7 +82,7 @@ test('commitAndMaybePush pushes when autoPush is true', async () => {
   await execFileAsync('git', ['push', '-u', 'origin', 'HEAD'], { cwd: dir });
 
   await writeFile(join(dir, 'b.json'), '{}');
-  const result = await commitAndMaybePush(dir, 'second commit', true);
+  const result = await createGitAdapter(dir).commitAndMaybePush('second commit', true);
 
   assert.equal(result.committed, true);
   assert.equal(result.pushed, true);

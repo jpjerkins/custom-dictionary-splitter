@@ -21,6 +21,10 @@ export interface NewChord {
   // stays on screen with its reason instead of silently disappearing.
   // Cleared on the next successful save of this chord (it just gets removed).
   saveError?: string;
+  // Set while editing this chord's stroke to a value that collides with
+  // another new chord already pending in this same batch (client-side only
+  // — see SortTable's findStrokeCollision). Holds the OTHER chord's word.
+  editConflict?: string;
 }
 
 export interface WordGroup {

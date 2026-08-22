@@ -18,7 +18,13 @@ const protectedFiles = ['6-main.json'];
 // success), so every render needs a WizardProvider. `seed` lets a test
 // preload fileHashes/checklist the way a real transition from Diff would.
 function renderSortTable(
-  props: { groups: WordGroup[]; priority?: string[]; protectedFiles?: string[] },
+  props: {
+    groups: WordGroup[];
+    priority?: string[];
+    protectedFiles?: string[];
+    deviceOrderMismatch?: boolean;
+    deviceMissingFiles?: string[];
+  },
   seed?: Partial<WizardState>
 ) {
   function Seed() {
@@ -43,6 +49,8 @@ function renderSortTable(
         groups={props.groups}
         priority={props.priority ?? priority}
         protectedFiles={props.protectedFiles ?? protectedFiles}
+        deviceOrderMismatch={props.deviceOrderMismatch}
+        deviceMissingFiles={props.deviceMissingFiles}
       />
     </WizardProvider>
   );
@@ -149,32 +157,53 @@ describe('SortTable', () => {
   });
 
   test('selecting a radio records that word\'s destination', () => {
+    // "ant" has no existingChords, so picking any writable file records the
+    // choice directly — no move/split prompt to interpose (that's a
+    // separate scenario, covered under "Move word" below).
     renderSortTable({ groups });
 
-    const catMiscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
-      (radio) => radio.getAttribute('name') === 'cat'
+    const antMiscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+      (radio) => radio.getAttribute('name') === 'ant'
     ) as HTMLInputElement;
-    const catPersonalRadio = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
-      (radio) => radio.getAttribute('name') === 'cat'
+    const antPersonalRadio = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+      (radio) => radio.getAttribute('name') === 'ant'
     ) as HTMLInputElement;
 
-    expect(catPersonalRadio.checked).toBe(true);
-    expect(catMiscRadio.checked).toBe(false);
+    expect(antMiscRadio.checked).toBe(false);
+    expect(antPersonalRadio.checked).toBe(false);
 
-    fireEvent.click(catMiscRadio);
+    fireEvent.click(antMiscRadio);
 
-    expect(catMiscRadio.checked).toBe(true);
-    expect(catPersonalRadio.checked).toBe(false);
+    expect(antMiscRadio.checked).toBe(true);
+    expect(antPersonalRadio.checked).toBe(false);
   });
 
-  test('delete removes the word', () => {
+  test('delete asks for confirmation inline and only removes on confirm', () => {
     renderSortTable({ groups });
 
     expect(screen.getByText('cat')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Delete cat' }));
 
+    // First click swaps in Confirm?/Cancel rather than deleting outright.
+    expect(screen.getByText('cat')).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: 'Confirm delete cat' });
+    expect(screen.getByRole('button', { name: 'Cancel delete cat' })).toBeInTheDocument();
+
+    fireEvent.click(confirmButton);
+
     expect(screen.queryByText('cat')).not.toBeInTheDocument();
     expect(screen.getByText('ant')).toBeInTheDocument();
+  });
+
+  test('cancelling a delete leaves the group intact', () => {
+    renderSortTable({ groups });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete cat' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel delete cat' }));
+
+    expect(screen.getByText('cat')).toBeInTheDocument();
+    // Back to the plain delete button, not stuck mid-confirmation.
+    expect(screen.getByRole('button', { name: 'Delete cat' })).toBeInTheDocument();
   });
 
   describe('Save', () => {
@@ -307,6 +336,158 @@ describe('SortTable', () => {
         expect(probe.touchedFiles).toEqual(['1-personal.json']);
         expect(probe.checklist).toEqual([]);
       });
+    });
+  });
+
+  test('editing a chord re-runs conflict detection', () => {
+    const editableGroups: WordGroup[] = [
+      {
+        word: 'bat',
+        existingChords: [],
+        newChords: [{ stroke: 'PWAT', kind: 'new', resolution: null }],
+        destinationFile: '1-personal.json',
+        invariantWarning: null,
+        priorityWarning: null,
+      },
+      {
+        word: 'cow',
+        existingChords: [],
+        newChords: [{ stroke: 'KOU', kind: 'new', resolution: null }],
+        destinationFile: '1-personal.json',
+        invariantWarning: null,
+        priorityWarning: null,
+      },
+    ];
+    renderSortTable({ groups: editableGroups });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit stroke PWAT' }));
+    const input = screen.getByLabelText('Edit stroke for bat');
+
+    // Typing the OTHER pending chord's stroke is a live collision within
+    // this same batch — flag it and block Save, without touching the
+    // server (no classify against disk has anything to say about it).
+    fireEvent.change(input, { target: { value: 'KOU' } });
+    expect(screen.getByText(/already used for "cow"/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+
+    fireEvent.change(input, { target: { value: 'TPWAT' } });
+    expect(screen.queryByText(/already used for "cow"/)).not.toBeInTheDocument();
+
+    fireEvent.blur(input);
+    expect(screen.getByText('TPWAT')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).not.toBeDisabled();
+  });
+
+  test('a device-order mismatch renders a warning banner', () => {
+    renderSortTable({ groups, deviceOrderMismatch: true });
+    expect(screen.getByText(/dictionary order doesn't match/)).toBeInTheDocument();
+  });
+
+  test('deviceMissingFiles renders a different warning than a device-order mismatch', () => {
+    renderSortTable({ groups, deviceMissingFiles: ['9-misc.json'] });
+    expect(screen.getByText(/firmware doesn't have these dictionaries loaded/)).toBeInTheDocument();
+    expect(screen.queryByText(/dictionary order doesn't match/)).not.toBeInTheDocument();
+  });
+
+  describe('Move word', () => {
+    const splitGroups: WordGroup[] = [
+      {
+        word: 'cat',
+        existingChords: [{ stroke: 'KAT', word: 'cat', file: '1-personal.json' }],
+        newChords: [{ stroke: 'K-AT', kind: 'new', resolution: null }],
+        destinationFile: '1-personal.json',
+        invariantWarning: null,
+        priorityWarning: null,
+      },
+    ];
+
+    beforeEach(() => {
+      vi.stubGlobal('fetch', vi.fn());
+    });
+
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    test('moving a group off its word file offers move-all or split-anyway', () => {
+      renderSortTable({ groups: splitGroups });
+
+      const miscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(miscRadio);
+
+      expect(screen.getByRole('button', { name: 'Move all' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Split anyway' })).toBeInTheDocument();
+      // Nothing applied yet — the radio itself hasn't moved to the new file.
+      expect(miscRadio.checked).toBe(false);
+    });
+
+    test('split anyway files the new chord without moving the existing ones', () => {
+      renderSortTable({ groups: splitGroups });
+
+      const miscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(miscRadio);
+      fireEvent.click(screen.getByRole('button', { name: 'Split anyway' }));
+
+      expect(miscRadio.checked).toBe(true);
+      expect(screen.queryByRole('button', { name: 'Move all' })).not.toBeInTheDocument();
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    test('move all calls POST /api/move-word and relocates the existing chords', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({ status: 'ok' }),
+      });
+
+      renderSortTable({ groups: splitGroups }, { fileHashes: { '1-personal.json': 'h1', '9-misc.json': 'h2' } });
+
+      const miscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(miscRadio);
+      fireEvent.click(screen.getByRole('button', { name: 'Move all' }));
+
+      await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/move-word', expect.anything()));
+
+      const [, init] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body).toEqual({
+        word: 'cat',
+        fromFile: '1-personal.json',
+        toFile: '9-misc.json',
+        capturedHashes: { '1-personal.json': 'h1', '9-misc.json': 'h2' },
+      });
+
+      await waitFor(() => expect(miscRadio.checked).toBe(true));
+      expect(screen.queryByRole('button', { name: 'Move all' })).not.toBeInTheDocument();
+    });
+
+    test('a partial move-word result is surfaced clearly and never treated as success', async () => {
+      (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          status: 'partial',
+          reason: "'cat' was written to 9-misc.json but could not be removed from 1-personal.json",
+        }),
+      });
+
+      renderSortTable({ groups: splitGroups }, { fileHashes: { '1-personal.json': 'h1', '9-misc.json': 'h2' } });
+
+      const miscRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(miscRadio);
+      fireEvent.click(screen.getByRole('button', { name: 'Move all' }));
+
+      await waitFor(() => expect(screen.getByText(/BOTH files/)).toBeInTheDocument());
+      // The prompt stays up (not silently dismissed as if it succeeded) and
+      // the radio was never applied.
+      expect(screen.getByRole('button', { name: 'Move all' })).toBeInTheDocument();
+      expect(miscRadio.checked).toBe(false);
     });
   });
 });

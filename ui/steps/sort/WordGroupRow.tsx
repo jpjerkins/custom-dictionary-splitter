@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ChordRow from './ChordRow.tsx';
 import type { WordGroup } from './types.ts';
 import type { ResolutionChoice } from '../../resolutions.ts';
@@ -21,6 +22,10 @@ export default function WordGroupRow({
   onResolveChord,
   onSelectDestination,
   onDeleteWord,
+  onEditStrokeDraft,
+  onCommitStroke,
+  invariantWarning,
+  priorityWarning,
 }: {
   group: WordGroup;
   priority: string[];
@@ -28,7 +33,21 @@ export default function WordGroupRow({
   onResolveChord: (word: string, stroke: string, resolution: ResolutionChoice | null) => void;
   onSelectDestination: (word: string, file: string) => void;
   onDeleteWord: (word: string) => void;
+  onEditStrokeDraft: (word: string, originalStroke: string, candidate: string) => void;
+  onCommitStroke: (word: string, originalStroke: string, candidate: string) => void;
+  // Computed fresh every render from the CURRENT groups (destinationFile,
+  // resolutions) rather than read off `group` itself — see SortTable's
+  // computeGroupWarnings. The backend always ships these as null (they only
+  // arise once the UI mutates a preset after the initial classify).
+  invariantWarning: string | null;
+  priorityWarning: string | null;
 }) {
+  // Plain click-to-delete risks losing a whole word's pending chords by
+  // accident; a native `confirm()` dialog is jarring and untestable the same
+  // way the rest of this UI is, so confirmation lives inline: first click
+  // swaps the button for Confirm?/Cancel, second click (Confirm?) deletes.
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+
   const rows = [
     ...group.existingChords.map((chord) => ({
       key: `existing:${chord.stroke}`,
@@ -46,6 +65,7 @@ export default function WordGroupRow({
     })),
   ];
   const rowCount = rows.length;
+  const warnings = [invariantWarning, priorityWarning].filter((w): w is string => w !== null);
 
   return (
     <>
@@ -63,11 +83,23 @@ export default function WordGroupRow({
             protectedFiles={row.existing ? undefined : protectedFiles}
             onResolve={row.existing ? undefined : (resolution) => onResolveChord(group.word, row.stroke, resolution)}
             saveError={row.existing ? undefined : row.chord?.saveError}
+            editConflict={row.existing ? undefined : row.chord?.editConflict}
+            onEditStrokeDraft={
+              row.existing ? undefined : (candidate) => onEditStrokeDraft(group.word, row.stroke, candidate)
+            }
+            onCommitStroke={
+              row.existing ? undefined : (candidate) => onCommitStroke(group.word, row.stroke, candidate)
+            }
           />
           {i === 0 && (
             <>
               <td className="word-cell" rowSpan={rowCount}>
                 {group.word}
+                {warnings.map((warning) => (
+                  <p key={warning} className="word-warning" role="status">
+                    {warning}
+                  </p>
+                ))}
               </td>
               {priority.map((file) => {
                 const isProtected = protectedFiles.includes(file);
@@ -90,14 +122,35 @@ export default function WordGroupRow({
                 );
               })}
               <td className="delete-cell" rowSpan={rowCount}>
-                <button
-                  type="button"
-                  className="btn-icon"
-                  aria-label={`Delete ${group.word}`}
-                  onClick={() => onDeleteWord(group.word)}
-                >
-                  &#x2715;
-                </button>
+                {confirmingDelete ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      aria-label={`Confirm delete ${group.word}`}
+                      onClick={() => onDeleteWord(group.word)}
+                    >
+                      Confirm?
+                    </button>
+                    <button
+                      type="button"
+                      className="btn-icon"
+                      aria-label={`Cancel delete ${group.word}`}
+                      onClick={() => setConfirmingDelete(false)}
+                    >
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn-icon"
+                    aria-label={`Delete ${group.word}`}
+                    onClick={() => setConfirmingDelete(true)}
+                  >
+                    &#x2715;
+                  </button>
+                )}
               </td>
             </>
           )}

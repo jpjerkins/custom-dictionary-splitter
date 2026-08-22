@@ -85,6 +85,60 @@ function buildDecisions(
   return { decisions, noOpKeys };
 }
 
+// Client-side-only collision check for chord editing: does `candidate`
+// already belong to some OTHER new chord pending in this same download
+// batch? This has nothing to do with what's on disk (that's what
+// classify()/the stroke index already resolved into 'chord-taken'/'both'
+// kinds) — it catches the user editing two chords into the same stroke
+// before either has been saved.
+function findStrokeCollision(
+  groups: WordGroup[],
+  excludeWord: string,
+  excludeStroke: string,
+  candidate: string
+): string | null {
+  for (const group of groups) {
+    for (const chord of group.newChords) {
+      if (group.word === excludeWord && chord.stroke === excludeStroke) continue;
+      if (chord.stroke === candidate) return group.word;
+    }
+  }
+  return null;
+}
+
+// invariantWarning/priorityWarning are always null from /api/classify (see
+// src/domain/grouping.ts) — they only describe drift the UI itself
+// introduces after that initial snapshot, so they're computed fresh from
+// the CURRENT groups on every render rather than stored as state:
+//   - invariantWarning: the word's radio has been pointed at a file other
+//     than where it already lives on disk (a deliberate "split anyway").
+//   - priorityWarning: after resolving conflicts, this word's own new
+//     chords are about to land in more than one file.
+function computeGroupWarnings(group: WordGroup): { invariantWarning: string | null; priorityWarning: string | null } {
+  const existingFiles = Array.from(new Set(group.existingChords.map((c) => c.file)));
+  const invariantWarning =
+    group.destinationFile && existingFiles.length > 0 && !existingFiles.includes(group.destinationFile)
+      ? `Splitting "${group.word}": it already exists in ${existingFiles.join(', ')}.`
+      : (group.invariantWarning ?? null);
+
+  const resolvedTargets = new Set<string>();
+  for (const chord of group.newChords) {
+    if (chord.kind === 'new' || chord.kind === 'word-exists') {
+      if (group.destinationFile) resolvedTargets.add(group.destinationFile);
+    } else if (chord.resolution?.targetFile) {
+      resolvedTargets.add(chord.resolution.targetFile);
+    } else if (chord.resolution?.kind === 'keep-keyboard' && chord.diskFile) {
+      resolvedTargets.add(chord.diskFile);
+    }
+  }
+  const priorityWarning =
+    resolvedTargets.size > 1
+      ? `"${group.word}"'s chords will land in more than one file: ${Array.from(resolvedTargets).join(', ')}.`
+      : (group.priorityWarning ?? null);
+
+  return { invariantWarning, priorityWarning };
+}
+
 // The Step 3 (Sort) table. Filing an entry used to be a two-click <select>
 // per row; this replaces it with one radio column per dictionary so filing
 // is a single click. `priority` drives column order (leftmost = highest
@@ -112,14 +166,27 @@ export default function SortTable({
   groups: initialGroups,
   priority,
   protectedFiles,
+  deviceOrderMismatch,
+  deviceMissingFiles,
 }: {
   groups: WordGroup[];
   priority: string[];
   protectedFiles: string[];
+  // From POST /api/classify's response. Two distinct, routine situations —
+  // conflated they'd read as one alarming "your keyboard is wrong" message,
+  // when in fact reordering dictionaries and adding a new one are both
+  // normal things to do.
+  deviceOrderMismatch?: boolean;
+  deviceMissingFiles?: string[];
 }) {
   const { state, setState, goToStep } = useWizard();
   const [groups, setGroups] = useState(initialGroups);
   const [saveStatus, setSaveStatus] = useState('');
+  // Set when a radio pick would split a word across files (it already has
+  // chords in some OTHER file): offers "move all" (POST /api/move-word) vs
+  // "split anyway" (just file the new chord there, leave the rest where it is).
+  const [splitPrompt, setSplitPrompt] = useState<{ word: string; toFile: string; fromFiles: string[] } | null>(null);
+  const [moveStatus, setMoveStatus] = useState('');
 
   function handleResolveChord(
     word: string,
@@ -140,8 +207,88 @@ export default function SortTable({
     );
   }
 
-  function handleSelectDestination(word: string, file: string) {
+  function applyDestination(word: string, file: string) {
     setGroups((prev) => prev.map((group) => (group.word === word ? { ...group, destinationFile: file } : group)));
+  }
+
+  function handleSelectDestination(word: string, file: string) {
+    const group = groups.find((g) => g.word === word);
+    const existingFiles = group ? Array.from(new Set(group.existingChords.map((c) => c.file))) : [];
+    // Only prompt when the word already lives somewhere else — picking the
+    // same file it's already in, or a first-time word, is never a split.
+    if (existingFiles.length > 0 && !existingFiles.includes(file)) {
+      setMoveStatus('');
+      setSplitPrompt({ word, toFile: file, fromFiles: existingFiles });
+      return;
+    }
+    applyDestination(word, file);
+  }
+
+  function handleSplitAnyway() {
+    if (!splitPrompt) return;
+    applyDestination(splitPrompt.word, splitPrompt.toFile);
+    setSplitPrompt(null);
+  }
+
+  async function handleMoveAll() {
+    if (!splitPrompt) return;
+    const { word, toFile, fromFiles } = splitPrompt;
+    const fileHashes = (state.fileHashes as Record<string, string> | null) ?? {};
+
+    setMoveStatus('Moving...');
+    let response: Response;
+    try {
+      response = await fetch('/api/move-word', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ word, fromFile: fromFiles[0], toFile, capturedHashes: fileHashes }),
+      });
+    } catch (err) {
+      setMoveStatus(`Error: ${(err as Error).message}`);
+      return;
+    }
+
+    if (!response.ok) {
+      const { error } = await response.json().catch(() => ({}));
+      setMoveStatus(`Error: ${error || response.statusText}`);
+      return;
+    }
+
+    const result: { status: 'ok' | 'stale' | 'error' | 'partial'; reason?: string; left?: { stroke: string; file: string }[] } =
+      await response.json();
+
+    if (result.status === 'stale' || result.status === 'error') {
+      setMoveStatus(`Could not move "${word}": ${result.reason}`);
+      return;
+    }
+
+    if (result.status === 'partial') {
+      // Never treat this as success: the word now exists in BOTH files and
+      // needs manual cleanup. Leave the prompt up so the message stays visible.
+      setMoveStatus(`"${word}" now exists in BOTH files and needs manual cleanup: ${result.reason}`);
+      return;
+    }
+
+    const leftKeys = new Set((result.left ?? []).map((c) => `${c.stroke}::${c.file}`));
+    setGroups((prev) =>
+      prev.map((group) =>
+        group.word === word
+          ? {
+              ...group,
+              existingChords: group.existingChords.map((c) =>
+                leftKeys.has(`${c.stroke}::${c.file}`) ? c : { ...c, file: toFile }
+              ),
+              destinationFile: toFile,
+            }
+          : group
+      )
+    );
+    setMoveStatus(
+      result.left && result.left.length > 0
+        ? `Moved "${word}" to ${toFile}. ${result.left.length} chord(s) stayed behind in a protected file.`
+        : `Moved "${word}" to ${toFile}.`
+    );
+    setSplitPrompt(null);
   }
 
   function handleDeleteWord(word: string) {
@@ -149,6 +296,42 @@ export default function SortTable({
     // so deleting is purely local — unlike the original's drop-a-row, which
     // could POST a removal because retried rows were already saved.
     setGroups((prev) => prev.filter((group) => group.word !== word));
+  }
+
+  function handleEditStrokeDraft(word: string, originalStroke: string, candidate: string) {
+    const collidingWord = candidate.trim() ? findStrokeCollision(groups, word, originalStroke, candidate.trim()) : null;
+    setGroups((prev) =>
+      prev.map((group) =>
+        group.word !== word
+          ? group
+          : {
+              ...group,
+              newChords: group.newChords.map((chord) =>
+                chord.stroke !== originalStroke ? chord : { ...chord, editConflict: collidingWord ?? undefined }
+              ),
+            }
+      )
+    );
+  }
+
+  function handleCommitStroke(word: string, originalStroke: string, candidate: string) {
+    const trimmed = candidate.trim();
+    const collidingWord = trimmed ? findStrokeCollision(groups, word, originalStroke, trimmed) : null;
+    setGroups((prev) =>
+      prev.map((group) =>
+        group.word !== word
+          ? group
+          : {
+              ...group,
+              newChords: group.newChords.map((chord) => {
+                if (chord.stroke !== originalStroke) return chord;
+                if (collidingWord) return { ...chord, editConflict: collidingWord };
+                if (!trimmed) return { ...chord, editConflict: 'a stroke cannot be blank' };
+                return { ...chord, stroke: trimmed, editConflict: undefined };
+              }),
+            }
+      )
+    );
   }
 
   async function handleSave() {
@@ -260,10 +443,41 @@ export default function SortTable({
     goToStep('empty');
   }
 
-  const blocked = hasUnresolvedConflicts(groups);
+  const blocked = hasUnresolvedConflicts(groups) || groups.some((group) => group.newChords.some((c) => c.editConflict));
 
   return (
     <div className="sort-step">
+      {deviceOrderMismatch && (
+        <p className="device-banner" role="status">
+          Your keyboard's dictionary order doesn't match what's on disk — reordered dictionaries are routine, but
+          double-check priority above looks right before saving.
+        </p>
+      )}
+      {deviceMissingFiles && deviceMissingFiles.length > 0 && (
+        <p className="device-banner" role="status">
+          The keyboard's firmware doesn't have these dictionaries loaded yet: {deviceMissingFiles.join(', ')}. You may
+          need to reflash before entries filed there take effect.
+        </p>
+      )}
+      {splitPrompt && (
+        <div className="split-prompt" role="alertdialog" aria-label={`Move ${splitPrompt.word}?`}>
+          <p>
+            "{splitPrompt.word}" already exists in {splitPrompt.fromFiles.join(', ')}. Move all of its chords to{' '}
+            {splitPrompt.toFile}, or just file the new chord there and leave the rest where it is?
+          </p>
+          <button type="button" className="btn" onClick={handleMoveAll}>
+            Move all
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleSplitAnyway}>
+            Split anyway
+          </button>
+          {moveStatus && (
+            <p className="conflict-error" role="alert">
+              {moveStatus}
+            </p>
+          )}
+        </div>
+      )}
       <div className="sort-table-scroll">
         <table className="entry-table sort-table">
           <thead>
@@ -294,17 +508,24 @@ export default function SortTable({
             </tr>
           </thead>
           <tbody>
-            {groups.map((group) => (
-              <WordGroupRow
-                key={group.word}
-                group={group}
-                priority={priority}
-                protectedFiles={protectedFiles}
-                onResolveChord={handleResolveChord}
-                onSelectDestination={handleSelectDestination}
-                onDeleteWord={handleDeleteWord}
-              />
-            ))}
+            {groups.map((group) => {
+              const { invariantWarning, priorityWarning } = computeGroupWarnings(group);
+              return (
+                <WordGroupRow
+                  key={group.word}
+                  group={group}
+                  priority={priority}
+                  protectedFiles={protectedFiles}
+                  onResolveChord={handleResolveChord}
+                  onSelectDestination={handleSelectDestination}
+                  onDeleteWord={handleDeleteWord}
+                  onEditStrokeDraft={handleEditStrokeDraft}
+                  onCommitStroke={handleCommitStroke}
+                  invariantWarning={invariantWarning}
+                  priorityWarning={priorityWarning}
+                />
+              );
+            })}
           </tbody>
         </table>
       </div>

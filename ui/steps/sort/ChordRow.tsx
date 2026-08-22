@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ConflictResolver from './ConflictResolver.tsx';
 import type { CaseKind, NewChord } from './types.ts';
 import type { ResolutionChoice } from '../../resolutions.ts';
@@ -18,6 +19,9 @@ export default function ChordRow({
   protectedFiles,
   onResolve,
   saveError,
+  editConflict,
+  onEditStrokeDraft,
+  onCommitStroke,
 }: {
   word: string;
   stroke: string;
@@ -30,13 +34,56 @@ export default function ChordRow({
   protectedFiles?: string[];
   onResolve?: (resolution: ResolutionChoice | null) => void;
   saveError?: string;
+  editConflict?: string;
+  onEditStrokeDraft?: (candidate: string) => void;
+  onCommitStroke?: (candidate: string) => void;
 }) {
   const isConflict = kind === 'chord-taken' || kind === 'both';
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(stroke);
+
+  // Editing is offered for plain new/word-exists chords only — a live
+  // conflict already has its own way to pick a different stroke via the
+  // re-chord resolution above, and layering a second stroke editor on top
+  // of that would just be two controls fighting over the same value.
+  const editable = !existing && !isConflict && onCommitStroke;
+
+  function startEditing() {
+    setDraft(stroke);
+    setEditing(true);
+  }
+
+  function commit() {
+    onCommitStroke?.(draft);
+    setEditing(false);
+  }
 
   return (
     <td className={existing ? 'chord-cell chord-cell-existing' : 'chord-cell'}>
-      <span className="chord-stroke">{stroke}</span>
+      {editing ? (
+        <input
+          type="text"
+          className="chord-edit-input"
+          aria-label={`Edit stroke for ${word}`}
+          value={draft}
+          onChange={(e) => {
+            setDraft(e.target.value);
+            onEditStrokeDraft?.(e.target.value);
+          }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') commit();
+          }}
+        />
+      ) : (
+        <span className="chord-stroke">{stroke}</span>
+      )}
       {existing && <span className="chord-hint">on disk</span>}
+      {editable && !editing && (
+        <button type="button" className="chord-edit-toggle" aria-label={`Edit stroke ${stroke}`} onClick={startEditing}>
+          &#9998;
+        </button>
+      )}
       {!existing && isConflict && chord && priority && protectedFiles && onResolve && (
         <ConflictResolver
           word={word}
@@ -45,6 +92,11 @@ export default function ChordRow({
           protectedFiles={protectedFiles}
           onChange={onResolve}
         />
+      )}
+      {!existing && editConflict && (
+        <p className="conflict-error" role="alert">
+          That stroke is already used for "{editConflict}" in this batch.
+        </p>
       )}
       {!existing && saveError && (
         <p className="conflict-error" role="alert">

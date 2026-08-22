@@ -332,7 +332,9 @@ describe('SortTable', () => {
 
       await waitFor(() => {
         const probe = JSON.parse(screen.getByTestId('state-probe').textContent!);
-        expect(probe.movedEntries).toEqual([{ stroke: 'PWAT', translation: 'bat', destinationFile: '1-personal.json' }]);
+        expect(probe.movedEntries).toEqual([
+          { stroke: 'PWAT', translation: 'bat', destinationFile: '1-personal.json', wasConflict: false },
+        ]);
         expect(probe.touchedFiles).toEqual(['1-personal.json']);
         expect(probe.checklist).toEqual([]);
       });

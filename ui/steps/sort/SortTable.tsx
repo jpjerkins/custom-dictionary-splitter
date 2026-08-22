@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import WordGroupRow from './WordGroupRow.tsx';
 import type { WordGroup } from './types.ts';
+import type { MovedEntry } from './retry.ts';
 import { hasUnresolvedConflicts, RESOLUTIONS } from '../../resolutions.ts';
 import { useWizard } from '../../state/WizardContext.tsx';
 
@@ -15,6 +16,15 @@ interface PendingDecision {
   remove?: boolean;
   word: string;
   chordStroke: string;
+  // True only for a keep-keyboard resolution of a 'chord-taken'/'both'
+  // chord: the only write that overwrites an existing on-disk entry in
+  // place. Everything else (override, re-chord, a plain new/word-exists
+  // chord) writes somewhere nothing occupied. Threaded into movedEntries
+  // so a later Step 6 failure can retry-drop this row by RESTORING
+  // `existingTranslation` instead of deleting the stroke — see
+  // ui/steps/sort/retry.ts.
+  wasConflict: boolean;
+  existingTranslation?: string;
 }
 
 // Turns the current groups into the /api/save wire shape. Mirrors
@@ -54,6 +64,7 @@ function buildDecisions(
           noOpKeys.add(`${group.word}::${chord.stroke}`);
           continue;
         }
+        const wasConflict = chord.resolution!.kind === 'keep-keyboard';
         for (const op of ops) {
           decisions.push({
             stroke: op.stroke,
@@ -63,6 +74,8 @@ function buildDecisions(
             remove: op.remove,
             word: group.word,
             chordStroke: chord.stroke,
+            wasConflict,
+            existingTranslation: wasConflict ? chord.diskWord : undefined,
           });
         }
       } else {
@@ -77,6 +90,7 @@ function buildDecisions(
           capturedHash: fileHashes[group.destinationFile],
           word: group.word,
           chordStroke: chord.stroke,
+          wasConflict: false,
         });
       }
     }
@@ -351,7 +365,10 @@ export default function SortTable({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          decisions: decisions.map(({ word: _word, chordStroke: _chordStroke, ...decision }) => decision),
+          decisions: decisions.map(
+            ({ word: _word, chordStroke: _chordStroke, wasConflict: _wasConflict, existingTranslation: _existingTranslation, ...decision }) =>
+              decision
+          ),
         }),
       });
     } catch (err) {
@@ -389,7 +406,7 @@ export default function SortTable({
 
     const succeededKeys = new Set(noOpKeys);
     const failedReasons = new Map<string, string>();
-    const movedEntries: { stroke: string; translation: string; destinationFile: string }[] = [];
+    const movedEntries: MovedEntry[] = [];
     const touchedFiles = new Set<string>();
 
     results.forEach((result, i) => {
@@ -404,6 +421,8 @@ export default function SortTable({
             stroke: decision.stroke,
             translation: decision.translation ?? '',
             destinationFile: decision.destinationFile,
+            wasConflict: decision.wasConflict,
+            existingTranslation: decision.existingTranslation,
           });
         }
         touchedFiles.add(decision.destinationFile);

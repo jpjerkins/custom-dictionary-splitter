@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import SortTable from './sort/SortTable.tsx';
+import RetryTable from './sort/RetryTable.tsx';
+import { buildRetryRows } from './sort/retry.ts';
+import type { RetryRow, MovedEntry } from './sort/retry.ts';
 import type { WordGroup } from './sort/types.ts';
+import type { ChecklistRow } from '../testChecklist.ts';
 import { useWizard } from '../state/WizardContext.tsx';
 
 interface ClassifyData {
@@ -13,14 +17,36 @@ interface ClassifyData {
 
 // The wrapper referenced in SortTable.tsx's header comment ("rather than in
 // a separate Step3Sort wrapper, which doesn't exist yet") — it didn't exist
-// until this task wired the wizard shell together. Fetches priority +
-// protectedFiles from GET /api/dictionaries and the classified groups from
-// POST /api/classify, then hands them to SortTable.
+// until this task wired the wizard shell together.
 //
+// A failed Step 6 test routes back here with `checklist` still holding the
+// failed rows (ported from public/js/steps/step3-sort.js's wizard:enter
+// handler, which always preferred outstanding retries over a fresh
+// classify). Snapshotted once on mount — like SortTable's `groups` and
+// Step2Diff/Step6Test's fetch effects — so this component doesn't flip
+// between retry and classify mode mid-session as the retry rows resolve.
+export default function Step3Sort() {
+  const { state } = useWizard();
+  const [mode] = useState<{ kind: 'retry'; rows: RetryRow[] } | { kind: 'classify' }>(() => {
+    const failedChecklistRows = (state.checklist as ChecklistRow[]).filter((row) => row.status === 'fail');
+    if (failedChecklistRows.length === 0) return { kind: 'classify' };
+    return { kind: 'retry', rows: buildRetryRows(failedChecklistRows, state.movedEntries as MovedEntry[]) };
+  });
+
+  return (
+    <section className="panel">
+      <h2 style={{ marginTop: 0 }}>3. Sort New &amp; Conflicting Entries</h2>
+      {mode.kind === 'retry' ? <RetryTable rows={mode.rows} /> : <ClassifySort />}
+    </section>
+  );
+}
+
+// Fetches priority + protectedFiles from GET /api/dictionaries and the
+// classified groups from POST /api/classify, then hands them to SortTable.
 // Keyed on a fetch counter (`version`) so a fresh classify remounts
 // SortTable rather than leaving it holding stale groups — SortTable copies
 // its `groups` prop into local state exactly once, on mount.
-export default function Step3Sort() {
+function ClassifySort() {
   const { state } = useWizard();
   const [status, setStatus] = useState('Loading...');
   const [data, setData] = useState<ClassifyData | null>(null);
@@ -68,24 +94,22 @@ export default function Step3Sort() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  if (!data) {
+    return (
+      <p data-testid="sort-status" className="text-muted">
+        {status}
+      </p>
+    );
+  }
+
   return (
-    <section className="panel">
-      <h2 style={{ marginTop: 0 }}>3. Sort New &amp; Conflicting Entries</h2>
-      {!data && (
-        <p data-testid="sort-status" className="text-muted">
-          {status}
-        </p>
-      )}
-      {data && (
-        <SortTable
-          key={version}
-          groups={data.groups}
-          priority={data.priority}
-          protectedFiles={data.protectedFiles}
-          deviceOrderMismatch={data.deviceOrderMismatch}
-          deviceMissingFiles={data.deviceMissingFiles}
-        />
-      )}
-    </section>
+    <SortTable
+      key={version}
+      groups={data.groups}
+      priority={data.priority}
+      protectedFiles={data.protectedFiles}
+      deviceOrderMismatch={data.deviceOrderMismatch}
+      deviceMissingFiles={data.deviceMissingFiles}
+    />
   );
 }

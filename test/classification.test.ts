@@ -49,11 +49,11 @@ test('unchanged is decided against the winner, not a shadowed entry', () => {
   // matches the WINNER -> unchanged
   assert.equal(byStroke({ KAT: 'cat' }).KAT.kind, 'unchanged');
 
-  // matches the SHADOWED entry -> NOT unchanged. It is 'both', because the
-  // chord is taken AND the word 'kata' exists on disk. The load-bearing part
-  // is that it is not 'unchanged' and that it reports the WINNER.
+  // matches the SHADOWED entry -> chord-taken, not unchanged and not both.
+  // 'kata' is on disk ONLY under KAT itself (shadowed), so it does NOT count
+  // as existing "under other chords". Kind is chord-taken, not both.
   const shadowedMatch = byStroke({ KAT: 'kata' }).KAT;
-  assert.notEqual(shadowedMatch.kind, 'unchanged');
+  assert.equal(shadowedMatch.kind, 'chord-taken');   // NOT 'both' — 'kata' exists only under KAT itself
   assert.equal(shadowedMatch.diskWord, 'cat');
   assert.equal(shadowedMatch.diskFile, '2-phil-mro.json');
 });

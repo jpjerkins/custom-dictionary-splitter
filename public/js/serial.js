@@ -1,8 +1,29 @@
 import { createResponseAccumulator, parseDictionaryList, parseDictionaryJson } from './serial-protocol.js';
 
+// Javelin discards everything written to the CDC port until it sees this exact
+// sequence, and routes console output to its HID interface until then, so
+// without it every command times out. It sends no reply of its own.
+const CONSOLE_HANDSHAKE = 'start_javelin_console\n';
+
+async function writeToPort(port, text) {
+  const writer = port.writable.getWriter();
+  try {
+    await writer.write(new TextEncoder().encode(text));
+  } finally {
+    writer.releaseLock();
+  }
+}
+
 export async function connectToKeyboard() {
   const port = await navigator.serial.requestPort();
   await port.open({ baudRate: 115200 });
+  // The firmware closes the console again the moment DTR drops.
+  try {
+    await port.setSignals({ dataTerminalReady: true, requestToSend: true });
+  } catch (err) {
+    console.warn('Failed to assert DTR/RTS', err);
+  }
+  await writeToPort(port, CONSOLE_HANDSHAKE);
   return port;
 }
 
@@ -15,12 +36,7 @@ function timeoutAfter(ms, command) {
 }
 
 async function readResponse(port, command) {
-  const writer = port.writable.getWriter();
-  try {
-    await writer.write(new TextEncoder().encode(`${command}\n`));
-  } finally {
-    writer.releaseLock();
-  }
+  await writeToPort(port, `${command}\n`);
 
   const reader = port.readable.getReader();
   const decoder = new TextDecoder();

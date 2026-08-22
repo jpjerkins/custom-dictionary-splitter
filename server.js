@@ -1,7 +1,7 @@
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
-import { loadConfig } from './lib/config.js';
+import { loadConfig } from './src/infrastructure/configProvider.ts';
 import { handleApiRequest } from './routes/api.js';
 
 const PORT = process.env.PORT || 4173;

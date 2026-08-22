@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadConfig } from '../lib/config.js';
+import { loadConfig, loadConfigFrom } from '../src/infrastructure/configProvider.ts';
 
 test('loadConfig reads dictionariesPath and defaults git.autoPush to false', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cds-config-'));
@@ -29,4 +29,21 @@ test('loadConfig throws when dictionariesPath does not exist', async () => {
 test('loadConfig throws when the config file is missing', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cds-config-'));
   assert.throws(() => loadConfig(join(dir, 'config.json')), /not found/);
+});
+
+test('protectedFiles defaults to the stock dictionaries when absent', () => {
+  const cfg = loadConfigFrom({ dictionariesPath: '/tmp/d' });
+  assert.deepEqual(cfg.protectedFiles, ['6-main.json', '7-commands.json']);
+});
+
+test('protectedFiles is taken verbatim when present, including empty', () => {
+  assert.deepEqual(loadConfigFrom({ dictionariesPath: '/tmp/d', protectedFiles: [] }).protectedFiles, []);
+  assert.deepEqual(
+    loadConfigFrom({ dictionariesPath: '/tmp/d', protectedFiles: ['x.json'] }).protectedFiles,
+    ['x.json'],
+  );
+});
+
+test('protectedFiles must be an array of strings', () => {
+  assert.throws(() => loadConfigFrom({ dictionariesPath: '/tmp/d', protectedFiles: 'main.json' }));
 });

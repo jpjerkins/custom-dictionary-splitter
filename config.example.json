@@ -1,4 +1,5 @@
 {
-  "dictionariesPath": "/Users/phil/dev/steno-dictionaries",
+  "dictionariesPath": "/Users/you/dev/steno-dictionaries",
+  "protectedFiles": ["6-main.json", "7-commands.json"],
   "git": { "autoPush": false }
 }

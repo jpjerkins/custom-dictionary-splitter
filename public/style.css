@@ -19,3 +19,8 @@ td, th {
 .status-pass { color: green; }
 .status-fail { color: crimson; }
 .status-pending { color: #888; }
+
+.conflict-row {
+  background-color: #fff3cd;
+  border-left: 4px solid #d97706;
+}

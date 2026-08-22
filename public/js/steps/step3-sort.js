@@ -10,6 +10,8 @@ function buildRows() {
   const conflictRows = state.diffResult.conflict.map((e) => ({
     stroke: e.stroke,
     translation: e.keyboardTranslation,
+    keyboardTranslation: e.keyboardTranslation,
+    existingTranslation: e.existingTranslation,
     destinationFile: e.existingFile,
     conflict: true,
   }));
@@ -20,6 +22,7 @@ function renderRows(tbody, rows) {
   tbody.innerHTML = '';
   for (const row of rows) {
     const tr = document.createElement('tr');
+    if (row.conflict) tr.classList.add('conflict-row');
 
     const strokeTd = document.createElement('td');
     strokeTd.textContent = row.stroke + (row.conflict ? ' (conflict)' : '');
@@ -32,6 +35,27 @@ function renderRows(tbody, rows) {
       row.translation = translationInput.value;
     });
     translationTd.appendChild(translationInput);
+
+    if (row.conflict) {
+      const keyboardButton = document.createElement('button');
+      keyboardButton.type = 'button';
+      keyboardButton.textContent = 'Use keyboard value';
+      keyboardButton.addEventListener('click', () => {
+        row.translation = row.keyboardTranslation;
+        translationInput.value = row.keyboardTranslation;
+      });
+      translationTd.appendChild(keyboardButton);
+
+      const existingButton = document.createElement('button');
+      existingButton.type = 'button';
+      existingButton.textContent = 'Use existing value';
+      existingButton.addEventListener('click', () => {
+        row.translation = row.existingTranslation;
+        translationInput.value = row.existingTranslation;
+      });
+      translationTd.appendChild(existingButton);
+    }
+
     tr.appendChild(translationTd);
 
     const fileTd = document.createElement('td');
@@ -77,13 +101,41 @@ export function initStep3() {
       body: JSON.stringify({ decisions }),
     });
     const { results } = await response.json();
-    const failed = results.filter((r) => r.status === 'stale' || r.status === 'error');
-    if (failed.length > 0) {
-      statusEl.textContent = `${failed.length} entries failed: ${failed.map((f) => `${f.stroke} (${f.reason})`).join(', ')}`;
+
+    const succeededRows = [];
+    const failedRows = [];
+    const failures = [];
+    results.forEach((result, i) => {
+      const row = rows[i];
+      if (result.status === 'stale' || result.status === 'error') {
+        failedRows.push(row);
+        failures.push(result);
+      } else {
+        succeededRows.push(row);
+      }
+    });
+
+    if (succeededRows.length > 0) {
+      state.movedEntries = [
+        ...state.movedEntries,
+        ...succeededRows.map((row) => ({ stroke: row.stroke, translation: row.translation })),
+      ];
+    }
+
+    const dictResponse = await fetch('/api/dictionaries');
+    const { files, index } = await dictResponse.json();
+    state.dictionaryIndex = index;
+    state.fileHashes = Object.fromEntries(Object.entries(files).map(([name, info]) => [name, info.hash]));
+
+    rows = failedRows;
+    renderRows(tbody, rows);
+
+    if (failures.length > 0) {
+      statusEl.textContent = `${failures.length} entries failed: ${failures.map((f) => `${f.stroke} (${f.reason})`).join(', ')}`;
       return;
     }
-    statusEl.textContent = `Saved ${results.length} entries.`;
-    state.movedEntries = rows.map((row) => ({ stroke: row.stroke, translation: row.translation }));
+
+    statusEl.textContent = `Saved ${succeededRows.length} entries.`;
     showStep('empty');
   });
 }

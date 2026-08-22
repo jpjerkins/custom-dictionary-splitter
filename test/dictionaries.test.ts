@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadDictionaryFiles, buildStrokeIndex } from '../lib/dictionaries.js';
+import { loadDictionaryFiles } from '../src/infrastructure/fsDictionaryRepository.ts';
+import { buildStrokeIndex } from '../src/domain/strokeIndex.ts';
 
 test('loadDictionaryFiles reads all json files with hash and entries, ignoring non-json files', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cds-dict-'));

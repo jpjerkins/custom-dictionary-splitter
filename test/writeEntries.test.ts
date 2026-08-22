@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, writeFile, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { loadDictionaryFiles } from '../lib/dictionaries.js';
-import { applyEntries } from '../lib/writeEntries.js';
+import { loadDictionaryFiles, applyEntries } from '../src/infrastructure/fsDictionaryRepository.ts';
 
 test('applyEntries writes a new entry sorted by steno key order', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cds-write-'));
@@ -96,7 +95,7 @@ test('applyEntries returns an error for an unknown destination file without writ
   ]);
 
   assert.equal(results[0].status, 'error');
-  assert.match(results[0].reason, /nope\.json/);
+  assert.match(results[0].reason!, /nope\.json/);
   const untouched = JSON.parse(await readFile(filePath, 'utf8'));
   assert.deepEqual(untouched, { TOP: 'top' });
 });

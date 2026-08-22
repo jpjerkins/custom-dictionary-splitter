@@ -1,5 +1,5 @@
-import { loadDictionaryFiles, buildStrokeIndex } from '../lib/dictionaries.js';
-import { applyEntries } from '../lib/writeEntries.js';
+import { loadDictionaryFiles, applyEntries } from '../src/infrastructure/fsDictionaryRepository.ts';
+import { buildStrokeIndex } from '../src/domain/strokeIndex.ts';
 import { createGitAdapter } from '../src/infrastructure/gitAdapter.ts';
 
 function readBody(req) {

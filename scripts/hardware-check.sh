@@ -42,8 +42,9 @@ cat "$OUT"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$OUT" REPO_ROOT="$REPO_ROOT" node --input-type=module -e '
 import { readFileSync } from "node:fs";
+// Node 22 runs .ts natively, so this checks the SHIPPING parser.
 const { parseDictionaryList } = await import(
-  process.env.REPO_ROOT + "/public/js/serial-protocol.js"
+  process.env.REPO_ROOT + "/ui/serial/serialProtocol.ts"
 );
 const raw = readFileSync(process.env.OUT, "utf8");
 const names = parseDictionaryList(raw.replace(/\n+$/, ""));

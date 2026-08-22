@@ -48,8 +48,8 @@ export async function handleApiRequest(req, res, config) {
     }
 
     if (req.method === 'POST' && req.url === '/api/commit') {
-      const { message } = await readBody(req);
-      const result = await commitAndMaybePush(config.dictionariesPath, message, config.git.autoPush);
+      const { message, files } = await readBody(req);
+      const result = await commitAndMaybePush(config.dictionariesPath, message, config.git.autoPush, files);
       sendJson(res, 200, result);
       return;
     }

@@ -39,6 +39,35 @@ test('commitAndMaybePush reports nothing to commit when working tree is clean', 
   assert.equal(result.committed, false);
 });
 
+test('commitAndMaybePush stages only the named files when files is given', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cds-git-'));
+  await initRepo(dir);
+  await writeFile(join(dir, 'a.json'), '{}');
+  await writeFile(join(dir, 'unrelated.txt'), 'dirty');
+
+  const result = await commitAndMaybePush(dir, 'targeted commit', false, ['a.json']);
+
+  assert.equal(result.committed, true);
+  const { stdout } = await execFileAsync('git', ['show', '--name-only', '--format=', 'HEAD'], { cwd: dir });
+  assert.deepEqual(stdout.trim().split('\n'), ['a.json']);
+  const { stdout: status } = await execFileAsync('git', ['status', '--porcelain'], { cwd: dir });
+  assert.match(status, /unrelated\.txt/);
+});
+
+test('commitAndMaybePush reports a push failure instead of throwing', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cds-git-'));
+  await initRepo(dir);
+  await writeFile(join(dir, 'a.json'), '{}');
+
+  const result = await commitAndMaybePush(dir, 'unpushable commit', true);
+
+  assert.equal(result.committed, true);
+  assert.equal(result.pushed, false);
+  assert.ok(result.pushError);
+  const { stdout } = await execFileAsync('git', ['log', '--oneline'], { cwd: dir });
+  assert.match(stdout, /unpushable commit/);
+});
+
 test('commitAndMaybePush pushes when autoPush is true', async () => {
   const bareDir = await mkdtemp(join(tmpdir(), 'cds-bare-'));
   await execFileAsync('git', ['init', '--bare'], { cwd: bareDir });

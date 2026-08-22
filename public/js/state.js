@@ -5,6 +5,7 @@ export const state = {
   fileHashes: null,
   diffResult: null,
   movedEntries: [],
+  touchedFiles: [],
   checklist: [],
 };
 

@@ -14,16 +14,17 @@ function renderChecklist(tbody, checklist, onUpdate) {
     expectedTd.textContent = row.expected;
     tr.appendChild(expectedTd);
 
-    const actualTd = document.createElement('td');
-    const actualInput = document.createElement('input');
-    actualInput.value = row.actual;
-    actualInput.addEventListener('input', () => onUpdate(i, actualInput.value));
-    actualTd.appendChild(actualInput);
-    tr.appendChild(actualTd);
-
     const statusTd = document.createElement('td');
     statusTd.textContent = row.status;
     statusTd.className = `status-${row.status}`;
+
+    const actualTd = document.createElement('td');
+    const actualInput = document.createElement('input');
+    actualInput.value = row.actual;
+    actualInput.addEventListener('input', () => onUpdate(i, actualInput.value, statusTd));
+    actualTd.appendChild(actualInput);
+    tr.appendChild(actualTd);
+
     tr.appendChild(statusTd);
 
     tbody.appendChild(tr);
@@ -36,14 +37,18 @@ export function initStep6() {
   const continueButton = document.getElementById('test-continue-button');
   const statusEl = document.getElementById('test-status');
 
-  function update(i, value) {
-    state.checklist[i] = checkRow(state.checklist[i], value);
-    renderChecklist(tbody, state.checklist, update);
+  function update(i, value, statusTd) {
+    const row = checkRow(state.checklist[i], value);
+    state.checklist[i] = row;
+    statusTd.textContent = row.status;
+    statusTd.className = `status-${row.status}`;
   }
 
   document.getElementById('step-test').addEventListener('wizard:enter', () => {
-    state.checklist = buildTestChecklist(state.movedEntries);
+    const previous = new Map(state.checklist.map((row) => [row.stroke, row]));
+    state.checklist = buildTestChecklist(state.movedEntries).map((row) => previous.get(row.stroke) || row);
     renderChecklist(tbody, state.checklist, update);
+    statusEl.textContent = '';
   });
 
   retryButton.addEventListener('click', () => showStep('sort'));

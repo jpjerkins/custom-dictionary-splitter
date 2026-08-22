@@ -1,9 +1,12 @@
 import { createServer } from 'node:http';
 import { readFileSync, existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
+import { loadConfig } from './lib/config.js';
+import { handleApiRequest } from './routes/api.js';
 
 const PORT = process.env.PORT || 4173;
 const PUBLIC_DIR = join(process.cwd(), 'public');
+const CONFIG_PATH = process.env.CONFIG_PATH || join(process.cwd(), 'config.json');
 
 const MIME_TYPES = {
   '.html': 'text/html',
@@ -30,11 +33,10 @@ function serveStatic(req, res) {
   res.end(readFileSync(filePath));
 }
 
-export function createApp() {
-  return createServer((req, res) => {
-    if (req.url === '/api/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ status: 'ok' }));
+export function createApp(config) {
+  return createServer(async (req, res) => {
+    if (req.url.startsWith('/api/')) {
+      await handleApiRequest(req, res, config);
       return;
     }
     serveStatic(req, res);
@@ -42,7 +44,8 @@ export function createApp() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  createApp().listen(PORT, () => {
+  const config = loadConfig(CONFIG_PATH);
+  createApp(config).listen(PORT, () => {
     console.log(`custom-dictionary-splitter running at http://localhost:${PORT}`);
   });
 }

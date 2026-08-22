@@ -6,7 +6,7 @@ let server;
 let baseUrl;
 
 before(async () => {
-  server = createApp();
+  server = createApp({ dictionariesPath: process.cwd(), git: { autoPush: false } });
   await new Promise((resolve) => server.listen(0, resolve));
   baseUrl = `http://localhost:${server.address().port}`;
 });

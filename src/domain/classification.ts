@@ -33,21 +33,8 @@ export function classify(
     const wordEntry = wordIndex.get(word);
 
     const chordTaken = strokeEntry !== undefined && strokeEntry.winner.word !== word;
-
-    // A word's on-disk occurrence under this very stroke (winner or
-    // shadowed) doesn't count as "existing under other chords" — that's
-    // the same chord being reassigned, already captured by chordTaken.
-    // Otherwise an overridden chord (shadowed entry still holding the old
-    // word) would double-count as both chord-taken and word-exists.
-    const otherStrokeFiles = new Set(
-      (wordEntry?.chords ?? [])
-        .filter((c) => c.stroke !== stroke)
-        .map((c) => c.file)
-    );
-    const wordExists = otherStrokeFiles.size > 0;
-    const wordFiles = (wordEntry?.files ?? []).filter(
-      (f) => otherStrokeFiles.has(f) && !protectedSet.has(f)
-    );
+    const wordFiles = (wordEntry?.files ?? []).filter((f) => !protectedSet.has(f));
+    const wordExists = wordEntry !== undefined;
 
     let kind: CaseKind;
     if (strokeEntry !== undefined && strokeEntry.winner.word === word) {

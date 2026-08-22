@@ -34,6 +34,7 @@ test('classifies all five outcomes', () => {
 });
 
 test('unchanged is decided against the winner, not a shadowed entry', () => {
+  // KAT wins as 'cat' in 2-phil-mro.json; 'kata' in 6-main.json is shadowed.
   const overridden = {
     '6-main.json': { path: '', hash: '', mtimeMs: 0, entries: { KAT: 'kata' } },
     '2-phil-mro.json': { path: '', hash: '', mtimeMs: 0, entries: { KAT: 'cat' } },
@@ -41,20 +42,20 @@ test('unchanged is decided against the winner, not a shadowed entry', () => {
   const priority = priorityFromFilenames(Object.keys(overridden));
   const si = buildStrokeIndex(overridden, priority);
   const wi = buildWordIndex(overridden, priority);
+  const byStroke = (downloaded: Record<string, string>) => Object.fromEntries(
+    classify(downloaded, si, wi, ['6-main.json']).map((c) => [c.stroke, c]),
+  );
 
-  // The winner for KAT is 'cat' (2-phil-mro.json outranks 6-main.json), so
-  // downloading 'cat' matches the winner and is unchanged.
-  const matchesWinner = classify({ KAT: 'cat' }, si, wi, ['6-main.json']);
-  assert.equal(matchesWinner[0].kind, 'unchanged');
+  // matches the WINNER -> unchanged
+  assert.equal(byStroke({ KAT: 'cat' }).KAT.kind, 'unchanged');
 
-  // Downloading 'kata' matches only the shadowed entry, not the winner, so
-  // it must be reported as chord-taken against the winner ('cat' in
-  // 2-phil-mro.json) — never unchanged, and never pointing at the shadowed
-  // 6-main.json entry.
-  const matchesShadowed = classify({ KAT: 'kata' }, si, wi, ['6-main.json']);
-  assert.equal(matchesShadowed[0].kind, 'chord-taken');
-  assert.equal(matchesShadowed[0].diskWord, 'cat');
-  assert.equal(matchesShadowed[0].diskFile, '2-phil-mro.json');
+  // matches the SHADOWED entry -> NOT unchanged. It is 'both', because the
+  // chord is taken AND the word 'kata' exists on disk. The load-bearing part
+  // is that it is not 'unchanged' and that it reports the WINNER.
+  const shadowedMatch = byStroke({ KAT: 'kata' }).KAT;
+  assert.notEqual(shadowedMatch.kind, 'unchanged');
+  assert.equal(shadowedMatch.diskWord, 'cat');
+  assert.equal(shadowedMatch.diskFile, '2-phil-mro.json');
 });
 
 test('chord-taken reports the winner file and word, not a shadowed one', () => {

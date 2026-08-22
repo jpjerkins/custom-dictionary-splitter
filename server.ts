@@ -5,7 +5,7 @@ import { loadConfig, type AppConfig } from './src/infrastructure/configProvider.
 import { handleApiRequest } from './routes/api.ts';
 
 const PORT = Number(process.env.PORT) || 4173;
-const PUBLIC_DIR = join(process.cwd(), 'public');
+const PUBLIC_DIR = join(process.cwd(), 'public', 'dist');
 const CONFIG_PATH = process.env.CONFIG_PATH || join(process.cwd(), 'config.json');
 
 const MIME_TYPES: Record<string, string> = {

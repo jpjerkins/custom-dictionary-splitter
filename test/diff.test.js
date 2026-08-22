@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { diffDictionary } from '../public/js/diff.js';
+import { diffDictionary } from '../ui/diff.ts';
 
 test('diffDictionary buckets new, conflicting, and unchanged strokes', () => {
   const downloaded = { KAT: 'cat', TKOG: 'dog', SPH: 'smile' };

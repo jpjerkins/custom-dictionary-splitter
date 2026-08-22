@@ -26,3 +26,13 @@ export function deviceOrderMismatch(expected: FileName[], device: FileName[]): b
   return filtered.length === expected.length &&
     filtered.some((f, i) => f !== expected[i]);
 }
+
+// A short device list short-circuits deviceOrderMismatch to false — it only
+// compares order, not completeness. This catches the sibling accident: a
+// firmware build that leaves a dictionary out entirely, silently making its
+// entries unavailable on the keyboard. Entries the device reports that are
+// not on-disk files (user_dictionary, jeff-numbers) are irrelevant here too.
+export function missingFromDevice(expected: FileName[], device: FileName[]): FileName[] {
+  const reported = new Set(device);
+  return expected.filter((f) => !reported.has(f));
+}

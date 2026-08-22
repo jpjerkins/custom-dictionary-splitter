@@ -1,5 +1,5 @@
 import type { DictionaryRepository } from './ports.ts';
-import { priorityFromFilenames, deviceOrderMismatch } from '../domain/priority.ts';
+import { priorityFromFilenames, deviceOrderMismatch, missingFromDevice } from '../domain/priority.ts';
 import { buildStrokeIndex } from '../domain/strokeIndex.ts';
 import { buildWordIndex } from '../domain/wordIndex.ts';
 import { classify } from '../domain/classification.ts';
@@ -14,6 +14,7 @@ export interface ClassifyDownloadedInput {
 export interface ClassifyDownloadedResult {
   groups: WordGroup[];
   deviceOrderMismatch: boolean;
+  deviceMissingFiles: FileName[];
 }
 
 export interface ClassifyDownloadedDeps {
@@ -35,6 +36,7 @@ export function createClassifyDownloadedUseCase({ repository, protectedFiles }: 
       return {
         groups,
         deviceOrderMismatch: deviceOrder === undefined ? false : deviceOrderMismatch(priority.files, deviceOrder),
+        deviceMissingFiles: deviceOrder === undefined ? [] : missingFromDevice(priority.files, deviceOrder),
       };
     },
   };

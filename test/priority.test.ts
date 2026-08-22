@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { priorityFromFilenames, deviceOrderMismatch } from '../src/domain/priority.ts';
+import { priorityFromFilenames, deviceOrderMismatch, missingFromDevice } from '../src/domain/priority.ts';
 
 test('priority follows ascending filename order, first wins', () => {
   const p = priorityFromFilenames(['6-main.json', '1-bible.json', '2-phil-mro.json']);
@@ -41,5 +41,26 @@ test('the real device list shape: unknown leading entries do not mask a reorder'
   assert.equal(
     deviceOrderMismatch(onDisk, ['user_dictionary', 'jeff-numbers', '1-bible.json', '6-main.json', '2-phil-mro.json']),
     true,
+  );
+});
+
+test('missingFromDevice reports on-disk files the device did not report', () => {
+  assert.deepEqual(
+    missingFromDevice(['1-a.json', '2-b.json', '3-c.json'], ['1-a.json', '3-c.json']),
+    ['2-b.json'],
+  );
+});
+
+test('missingFromDevice is empty when the device reports everything', () => {
+  assert.deepEqual(
+    missingFromDevice(['1-a.json', '2-b.json'], ['2-b.json', '1-a.json']),
+    [],
+  );
+});
+
+test('missingFromDevice ignores device entries that are not on-disk files', () => {
+  assert.deepEqual(
+    missingFromDevice(['1-a.json'], ['user_dictionary', 'jeff-numbers']),
+    ['1-a.json'],
   );
 });

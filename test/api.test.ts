@@ -100,6 +100,34 @@ test('POST /api/classify reports deviceOrderMismatch false for a correct order i
   assert.equal(body.deviceOrderMismatch, false);
 });
 
+test('POST /api/classify returns an empty deviceMissingFiles for a complete device order', async () => {
+  const response = await fetch(`${baseUrl}/api/classify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ downloaded: { TPHU: 'zebra' }, deviceOrder: ['a.json', 'b.json', 'user_dictionary'] }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.deviceMissingFiles, []);
+  assert.equal(body.deviceOrderMismatch, false);
+});
+
+test('POST /api/classify reports deviceMissingFiles for a partial device order, independently of deviceOrderMismatch', async () => {
+  const response = await fetch(`${baseUrl}/api/classify`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ downloaded: { TPHU: 'zebra' }, deviceOrder: ['a.json'] }),
+  });
+  const body = await response.json();
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.deviceMissingFiles, ['b.json']);
+  // The partial-order short-circuits deviceOrderMismatch to false — that's
+  // the gap deviceMissingFiles exists to cover, not a regression.
+  assert.equal(body.deviceOrderMismatch, false);
+});
+
 test('POST /api/move-word surfaces ok, stale, and error statuses from the use case', async () => {
   const dictResponse = await fetch(`${baseUrl}/api/dictionaries`);
   const { files } = await dictResponse.json();

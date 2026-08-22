@@ -81,3 +81,14 @@ test('keep-disk writes nothing at all', () => {
   const ctx = ctxFor({ kind: 'chord-taken', diskFile: '6-main.json' }, []);
   assert.deepEqual(resolutionByKind('keep-disk').toWriteOps(ctx, { kind: 'keep-disk' }), []);
 });
+
+test('keep-keyboard overwrites the on-disk entry in its own file with the keyboard word', () => {
+  const ctx = ctxFor(
+    { stroke: 'KAT', word: 'cat', kind: 'chord-taken', diskWord: 'kata', diskFile: '4-phil-nav.json' },
+    [], // not protected, so keep-keyboard is available
+  );
+  assert.deepEqual(
+    resolutionByKind('keep-keyboard').toWriteOps(ctx, { kind: 'keep-keyboard' }),
+    [{ file: '4-phil-nav.json', stroke: 'KAT', word: 'cat' }],
+  );
+});

@@ -8,8 +8,11 @@ export async function connectToKeyboard() {
 
 async function sendCommand(port, command) {
   const writer = port.writable.getWriter();
-  await writer.write(new TextEncoder().encode(`${command}\n`));
-  writer.releaseLock();
+  try {
+    await writer.write(new TextEncoder().encode(`${command}\n`));
+  } finally {
+    writer.releaseLock();
+  }
 
   const reader = port.readable.getReader();
   const decoder = new TextDecoder();

@@ -1,5 +1,6 @@
 import type { DictionaryRepository } from './ports.ts';
 import { buildStrokeIndex, type StrokeIndexEntry } from '../domain/strokeIndex.ts';
+import { priorityFromFilenames } from '../domain/priority.ts';
 import type { FileName, Stroke } from '../domain/types.ts';
 
 export interface LoadDictionariesDeps {
@@ -8,14 +9,15 @@ export interface LoadDictionariesDeps {
 
 export interface LoadDictionariesResult {
   files: Record<FileName, { hash: string }>;
-  index: Record<Stroke, StrokeIndexEntry>;
+  index: Map<Stroke, StrokeIndexEntry>;
 }
 
 export function createLoadDictionariesUseCase({ repository }: LoadDictionariesDeps) {
   return {
     execute(): LoadDictionariesResult {
       const files = repository.load();
-      const index = buildStrokeIndex(files);
+      const priority = priorityFromFilenames(Object.keys(files));
+      const index = buildStrokeIndex(files, priority);
       const fileSummaries = Object.fromEntries(
         Object.entries(files).map(([name, info]) => [name, { hash: info.hash }])
       );

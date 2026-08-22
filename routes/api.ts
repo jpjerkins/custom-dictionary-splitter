@@ -36,7 +36,11 @@ export async function handleApiRequest(req: IncomingMessage, res: ServerResponse
     if (req.method === 'GET' && req.url === '/api/dictionaries') {
       const repository = createFsDictionaryRepository(config.dictionariesPath);
       const useCase = createLoadDictionariesUseCase({ repository });
-      sendJson(res, 200, useCase.execute());
+      const { files, index } = useCase.execute();
+      const legacyIndex = Object.fromEntries(
+        Array.from(index, ([stroke, entry]) => [stroke, { file: entry.winner.file, translation: entry.winner.word }])
+      );
+      sendJson(res, 200, { files, index: legacyIndex });
       return;
     }
 

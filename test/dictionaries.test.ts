@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { loadDictionaryFiles } from '../src/infrastructure/fsDictionaryRepository.ts';
 import { buildStrokeIndex } from '../src/domain/strokeIndex.ts';
+import { priorityFromFilenames } from '../src/domain/priority.ts';
 
 test('loadDictionaryFiles reads all json files with hash and entries, ignoring non-json files', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'cds-dict-'));
@@ -25,9 +26,9 @@ test('buildStrokeIndex merges entries across files by stroke', async () => {
   await writeFile(join(dir, 'b.json'), JSON.stringify({ TKOG: 'dog' }));
   const files = loadDictionaryFiles(dir);
 
-  const index = buildStrokeIndex(files);
+  const index = buildStrokeIndex(files, priorityFromFilenames(Object.keys(files)));
 
-  assert.equal(index.KAT.file, 'a.json');
-  assert.equal(index.KAT.translation, 'cat');
-  assert.equal(index.TKOG.file, 'b.json');
+  assert.equal(index.get('KAT')!.winner.file, 'a.json');
+  assert.equal(index.get('KAT')!.winner.word, 'cat');
+  assert.equal(index.get('TKOG')!.winner.file, 'b.json');
 });

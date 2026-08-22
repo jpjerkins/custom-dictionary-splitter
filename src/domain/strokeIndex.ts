@@ -1,5 +1,4 @@
-import type { DictionaryFile } from '../application/ports.ts';
-import type { FileName, Stroke, Word } from './types.ts';
+import type { DictionaryFile, FileName, Stroke, Word } from './types.ts';
 
 export interface StrokeIndexEntry {
   file: FileName;

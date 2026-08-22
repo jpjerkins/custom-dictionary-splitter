@@ -2,9 +2,9 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { compareStrokes, isStrokeParseable } from '../domain/stenoOrder.ts';
-import type { DictionaryFile, DictionaryRepository } from '../application/ports.ts';
+import type { DictionaryRepository } from '../application/ports.ts';
 import type { ApplyDecision, ApplyResult } from '../application/saveDecisions.ts';
-import type { FileName, Stroke, Word } from '../domain/types.ts';
+import type { DictionaryFile, FileName, Stroke, Word } from '../domain/types.ts';
 
 export function loadDictionaryFiles(dirPath: string): Record<FileName, DictionaryFile> {
   const files = readdirSync(dirPath).filter((f) => f.endsWith('.json'));

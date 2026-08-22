@@ -7,3 +7,10 @@ export interface DictionaryEntry {
   word: Word;
   file: FileName;
 }
+
+export interface DictionaryFile {
+  path: string;
+  entries: Record<Stroke, Word>;
+  hash: string;
+  mtimeMs: number;
+}

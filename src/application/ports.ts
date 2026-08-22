@@ -1,11 +1,4 @@
-import type { FileName, Stroke, Word } from '../domain/types.ts';
-
-export interface DictionaryFile {
-  path: string;
-  entries: Record<Stroke, Word>;
-  hash: string;
-  mtimeMs: number;
-}
+import type { DictionaryFile, FileName, Stroke, Word } from '../domain/types.ts';
 
 export interface DictionaryRepository {
   load(): Record<FileName, DictionaryFile>;

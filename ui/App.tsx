@@ -28,7 +28,7 @@ const STEP_COMPONENTS: Record<StepName, ComponentType> = {
 // Step 3 is a dense table that has to fill whatever vertical space the
 // chrome leaves, and pinning its column headers requires a scroll container
 // with a bounded height. Expressing that as a flex chain
-// (.wizard-main > .wizard-step > .panel-fill > .sort-step >
+// (.wizard-main > .wizard-step > .step-band > .sort-step >
 // .sort-table-scroll, each flex:1 min-height:0) means the table measures the
 // leftover space itself instead of a hard-coded viewport subtraction that
 // silently goes wrong whenever a banner appears or the title rewraps.

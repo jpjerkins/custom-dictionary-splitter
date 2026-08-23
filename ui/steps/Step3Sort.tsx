@@ -33,10 +33,14 @@ export default function Step3Sort() {
     return { kind: 'retry', rows: buildRetryRows(failedChecklistRows, state.movedEntries as MovedEntry[]) };
   });
 
-  // panel-fill: this step's table has to claim the leftover viewport height
-  // rather than grow the page (see WizardShell's comment).
+  // step-band, not .panel: this step is a stack of full-width bands
+  // separated by rules rather than a card floating on the page. A card says
+  // "separate object"; this screen is one dense table that should own the
+  // viewport, and the card's border, radius, shadow and padding cost rows
+  // for framing nothing else competes with. The other six steps keep .panel
+  // — they are short, and the framing still earns its keep there.
   return (
-    <section className="panel panel-fill">
+    <section className="step-band">
       <h2 className="step-title">3. Sort New &amp; Conflicting Entries</h2>
       {mode.kind === 'retry' ? <RetryTable rows={mode.rows} /> : <ClassifySort />}
     </section>

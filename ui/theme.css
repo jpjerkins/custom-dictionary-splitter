@@ -209,20 +209,27 @@ select {
   box-shadow: var(--shadow-elevated);
 }
 
-/* Opt-in for a step that fills the viewport instead of flowing (Step 3).
-   Its own overflow is hidden because the scrolling happens further in, at
-   .sort-table-scroll, which is what the sticky headers stick to. */
-.panel-fill {
+/* Banded step (Step 3): a stack of full-width sections separated by rules,
+   instead of a card floating on the page. No border, radius, shadow, or
+   horizontal padding of its own — the separation comes from the rules on
+   .step-title and .sort-table-actions, and from the table band sitting on
+   --color-surface against the page's --color-bg.
+
+   Fills the viewport instead of flowing, and hides its own overflow because
+   the scrolling happens further in at .sort-table-scroll, which is what the
+   sticky headers stick to. */
+.step-band {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  padding: var(--space-3);
 }
 
 .step-title {
   margin: 0 0 var(--space-2);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
   font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--color-text-muted);
@@ -330,8 +337,16 @@ select {
   flex: 1;
   min-height: 0;
   overflow: auto;
+  /* A band, not a card: rules top and bottom, no side borders, no radius,
+     and pulled out through .wizard-main's horizontal padding so it runs
+     edge to edge. .wizard-main hides its own overflow, so the negative
+     margin cannot make the page scroll sideways. */
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  border-left: 0;
+  border-right: 0;
+  border-radius: 0;
+  background: var(--color-surface);
+  margin: 0 calc(-1 * var(--space-3));
 }
 
 /* The last link in the chain above: banners and the Save row size to
@@ -481,6 +496,17 @@ select {
 .word-cell {
   font-weight: 600;
   border-left: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+/* Bounds the Word column. See WordGroupRow's comment: with the table at
+   min-width:max-content, a max-width on the <td> is ignored, so the width
+   lives on a block child instead. Warnings then wrap inside the column
+   rather than widening it until the delete column is off-screen. */
+.word-cell-inner {
+  width: 12rem;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .radio-cell {
@@ -531,6 +557,12 @@ select {
   border-radius: var(--radius-sm);
   background: var(--color-warning-muted);
   white-space: normal;
+  /* Capped for the same reason as .word-cell-inner: under
+     min-width:max-content this box's longest option label would otherwise
+     set the Chords column's width. The resolution labels are the longest
+     strings in the table. */
+  width: 20rem;
+  box-sizing: border-box;
 }
 
 .conflict-resolver .chord-hint-conflict {
@@ -606,11 +638,14 @@ select {
 }
 
 /* Save gate below the sort table. */
+/* The save row is its own band below the table. It needs no rule of its
+   own — the table band above already carries a bottom border, and a second
+   line here would read as a double rule. */
 .sort-table-actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-top: var(--space-2);
+  margin-top: var(--space-3);
   /* Never let the Save row be squeezed out by the table above it. */
   flex-shrink: 0;
 }

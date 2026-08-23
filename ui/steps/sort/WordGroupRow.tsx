@@ -124,12 +124,19 @@ export default function WordGroupRow({
           {i === 0 && (
             <>
               <td className="word-cell" rowSpan={rowCount}>
-                {group.word}
-                {warnings.map((warning) => (
-                  <p key={warning} className="word-warning" role="status">
-                    {warning}
-                  </p>
-                ))}
+                {/* Fixed-width inner block, not a width on the <td>: the
+                    table is sized min-width:max-content, under which a cell's
+                    own max-width is ignored. A block child with a real width
+                    is what actually bounds the column, so a long warning
+                    wraps instead of shoving the delete column off-screen. */}
+                <div className="word-cell-inner">
+                  {group.word}
+                  {warnings.map((warning) => (
+                    <p key={warning} className="word-warning" role="status">
+                      {warning}
+                    </p>
+                  ))}
+                </div>
               </td>
               {priority.map((file) => {
                 const isProtected = protectedFiles.includes(file);

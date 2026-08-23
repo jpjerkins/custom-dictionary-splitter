@@ -171,12 +171,18 @@ select {
    App.tsx's WizardShell comment for why. `overflow: hidden` here is what
    stops the body scrolling sideways — wide content scrolls inside its own
    container (.sort-table-scroll) instead of pushing the page out. */
+/* No HORIZONTAL padding, deliberately. Step 3's table band runs edge to
+   edge, and the only way to do that from inside a padded ancestor is a
+   negative margin — which any ancestor with overflow != visible clips
+   (.wizard-step scrolls, so it did exactly that, shaving the first column).
+   So the inset lives on the individual bands instead, and anything that
+   wants to reach the edge simply doesn't ask for it. */
 .wizard-main {
   height: 100dvh;
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-2) 0;
   overflow: hidden;
 }
 
@@ -185,6 +191,7 @@ select {
    thing on screen once you're three steps in. */
 .wizard-title {
   margin: 0;
+  padding: 0 var(--space-3);
   font-size: var(--font-size-lg);
   font-weight: 600;
   color: var(--color-text-muted);
@@ -199,6 +206,12 @@ select {
   display: flex;
   flex-direction: column;
   overflow: auto;
+}
+
+/* The six card steps still want to be inset — only the banded step reaches
+   the edges, and it does so by not being padded rather than by escaping. */
+.wizard-step > .panel {
+  margin: 0 var(--space-3);
 }
 
 .panel {
@@ -228,11 +241,28 @@ select {
 
 .step-title {
   margin: 0 0 var(--space-2);
-  padding-bottom: var(--space-2);
+  padding: 0 var(--space-3) var(--space-2);
   border-bottom: 1px solid var(--color-border);
   font-size: var(--font-size-base);
   font-weight: 600;
   color: var(--color-text-muted);
+}
+
+/* Everything in the band EXCEPT the table itself is inset from the edges.
+   Text sitting flush against the viewport edge is uncomfortable to read;
+   a wide table is not. Boxes that carry their own border or background get
+   margin rather than padding, so the box stays inset instead of its
+   contents. */
+.sort-table-actions,
+.sort-step > p:last-child {
+  padding-left: var(--space-3);
+  padding-right: var(--space-3);
+}
+
+.sort-step > .device-banner,
+.sort-step > .split-prompt {
+  margin-left: var(--space-3);
+  margin-right: var(--space-3);
 }
 
 .text-muted {
@@ -337,16 +367,15 @@ select {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  /* A band, not a card: rules top and bottom, no side borders, no radius,
-     and pulled out through .wizard-main's horizontal padding so it runs
-     edge to edge. .wizard-main hides its own overflow, so the negative
-     margin cannot make the page scroll sideways. */
+  /* A band, not a card: rules top and bottom, no side borders, no radius.
+     It reaches the viewport edges because nothing above it adds horizontal
+     padding — NOT via a negative margin, which .wizard-step's overflow
+     would clip. */
   border: 1px solid var(--color-border);
   border-left: 0;
   border-right: 0;
   border-radius: 0;
   background: var(--color-surface);
-  margin: 0 calc(-1 * var(--space-3));
 }
 
 /* The last link in the chain above: banners and the Save row size to

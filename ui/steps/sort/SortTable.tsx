@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import WordGroupRow from './WordGroupRow.tsx';
 import type { WordGroup } from './types.ts';
 import type { MovedEntry } from './retry.ts';
@@ -297,6 +297,24 @@ export default function SortTable({
     wasDecided: boolean;
   } | null>(null);
   const [moveStatus, setMoveStatus] = useState('');
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+
+  // Jump the table to a word's row. The table scrolls inside its own
+  // container (that's what the sticky headers stick to), so this scrolls
+  // that container rather than the page. `block: 'center'` keeps the row
+  // clear of the pinned header instead of landing underneath it.
+  function scrollToWord(word: string) {
+    const container = tableScrollRef.current;
+    if (!container) return;
+    const row = Array.from(container.querySelectorAll<HTMLElement>('[data-word-row]')).find(
+      (el) => el.dataset.wordRow === word
+    );
+    // scrollIntoView is absent under jsdom, which does no layout.
+    row?.scrollIntoView?.({
+      block: 'center',
+      behavior: window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
+  }
 
   // The split prompt is a question. Picking somewhere else instead of
   // answering it must leave the word that raised it exactly as it was
@@ -674,7 +692,7 @@ export default function SortTable({
           )}
         </div>
       )}
-      <div className="sort-table-scroll">
+      <div className="sort-table-scroll" ref={tableScrollRef}>
         <table className="entry-table sort-table">
           <thead>
             <tr>
@@ -747,13 +765,19 @@ export default function SortTable({
           Save
         </button>
         {blocked && (
-          // Names the words rather than just stating the rule. "Resolve all
-          // chord conflicts before saving" is true but unactionable: with a
-          // few hundred rows in a scrolling container there is no way to
-          // find the handful that are blocking.
+          // Names ONE word — the first still-blocking row in table order,
+          // which is the order the list is worked in — and makes it a jump
+          // target. "Resolve all chord conflicts before saving" was true but
+          // unactionable: with a few hundred rows in a scrolling container
+          // there was nowhere to look. Listing every blocker instead just
+          // moves the haystack into the message; the next one down is the
+          // only one that matters while working top to bottom.
           <p className="sort-table-save-reason" role="status">
-            Resolve conflicts for: {blockingWords.slice(0, 3).join(', ')}
-            {blockingWords.length > 3 ? ` (and ${blockingWords.length - 3} more)` : ''}.
+            Resolve conflicts for{' '}
+            <button type="button" className="link-button" onClick={() => scrollToWord(blockingWords[0]!)}>
+              {blockingWords[0]}
+            </button>
+            {blockingWords.length > 1 ? ` and ${blockingWords.length - 1} more` : ''}.
           </p>
         )}
       </div>

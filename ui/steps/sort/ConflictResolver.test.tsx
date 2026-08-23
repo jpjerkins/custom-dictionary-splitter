@@ -175,8 +175,10 @@ describe('ConflictResolver', () => {
 
     const saveButton = screen.getByRole('button', { name: /save/i });
     expect(saveButton).toBeDisabled();
-    // The gate names the blocking word rather than restating the rule.
-    expect(screen.getByText(/Resolve conflicts for:.*\bant\b/i)).toBeInTheDocument();
+    // The gate names the blocking word rather than restating the rule, as a
+    // button that jumps the table to it.
+    expect(screen.getByText(/Resolve conflicts for/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'ant' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: /keep on-disk word/i }));
 

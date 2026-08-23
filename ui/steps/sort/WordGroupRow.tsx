@@ -91,6 +91,10 @@ export default function WordGroupRow({
       {rows.map((row, i) => (
         <tr
           key={row.key}
+          // Anchor for the save gate's jump target, on the group's FIRST row
+          // so scrolling lands at the top of the word rather than partway
+          // down its chords.
+          data-word-row={i === 0 ? group.word : undefined}
           className={
             (row.existing ? 'word-group-row word-group-row-existing' : 'word-group-row') + statusClass
           }

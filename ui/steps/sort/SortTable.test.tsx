@@ -333,12 +333,12 @@ describe('SortTable', () => {
       }
     });
 
-    test('the save gate names the words that are blocking it', () => {
+    test('the save gate names the word that is blocking it', () => {
       renderSortTable({ groups });
 
-      expect(screen.getByText(/Resolve conflicts for:.*\bant\b/)).toBeInTheDocument();
-      // 'cat' is not blocking, so it must not be named.
-      expect(screen.queryByText(/Resolve conflicts for:.*\bcat\b/)).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'ant' })).toBeInTheDocument();
+      // 'cat' is not blocking, so it must not be offered as a jump target.
+      expect(screen.queryByRole('button', { name: 'cat' })).not.toBeInTheDocument();
     });
 
     test('confirming the suggested file still counts as deciding', () => {
@@ -391,6 +391,93 @@ describe('SortTable', () => {
     });
   });
 
+  // The gate points at ONE word — the next one going down the list — rather
+  // than listing several, because the list is worked top to bottom.
+  describe('save gate jump target', () => {
+    function blockedGroup(word: string): WordGroup {
+      return {
+        word,
+        existingChords: [],
+        newChords: [
+          {
+            stroke: `ST${word.toUpperCase()}`,
+            kind: 'chord-taken',
+            diskWord: 'x',
+            diskFile: '9-misc.json',
+            resolution: null,
+          },
+        ],
+        destinationFile: null,
+        invariantWarning: null,
+        priorityWarning: null,
+      };
+    }
+
+    test('names only the first blocking word, then counts the rest', () => {
+      renderSortTable({ groups: ['ant', 'bat', 'cat'].map(blockedGroup) });
+
+      expect(screen.getByRole('button', { name: 'ant' })).toBeInTheDocument();
+      expect(screen.getByText(/and 2 more/)).toBeInTheDocument();
+      // The others are counted, not named.
+      expect(screen.queryByRole('button', { name: 'bat' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'cat' })).not.toBeInTheDocument();
+    });
+
+    test('a single blocking word gets no "and N more" tail', () => {
+      renderSortTable({ groups: [blockedGroup('ant')] });
+
+      expect(screen.getByRole('button', { name: 'ant' })).toBeInTheDocument();
+      expect(screen.queryByText(/more/)).not.toBeInTheDocument();
+    });
+
+    test('the named word advances as earlier ones are resolved', () => {
+      renderSortTable({ groups: ['ant', 'bat'].map(blockedGroup) });
+
+      expect(screen.getByRole('button', { name: 'ant' })).toBeInTheDocument();
+
+      // Resolve 'ant' only. The gate must move on to the next one down.
+      const antOptions = screen
+        .getAllByRole('radio')
+        .filter((radio) => radio.getAttribute('name') === 'resolve-ant-STANT');
+      fireEvent.click(antOptions.find((o) => o.getAttribute('value') === 'keep-disk') as HTMLInputElement);
+
+      expect(screen.queryByRole('button', { name: 'ant' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'bat' })).toBeInTheDocument();
+      expect(screen.queryByText(/more/)).not.toBeInTheDocument();
+    });
+
+    test("clicking the word scrolls that word's row into view", () => {
+      const scrollIntoView = vi.fn();
+      // jsdom does no layout, so scrollIntoView does not exist on Element —
+      // stub it and record which row it was called on.
+      Object.defineProperty(Element.prototype, 'scrollIntoView', {
+        value: scrollIntoView,
+        configurable: true,
+        writable: true,
+      });
+
+      // A NON-blocking group leads, so the jump target ('bat') is not the
+      // first row in the table. Without that, "scroll to the first row" and
+      // "scroll to the named word" are the same element and the test proves
+      // nothing.
+      const settled: WordGroup = {
+        word: 'aaa',
+        existingChords: [],
+        newChords: [{ stroke: 'STAAA', kind: 'new', resolution: null }],
+        destinationFile: '1-personal.json',
+        invariantWarning: null,
+        priorityWarning: null,
+      };
+      renderSortTable({ groups: [settled, blockedGroup('bat'), blockedGroup('cat')] });
+
+      fireEvent.click(screen.getByRole('button', { name: 'bat' }));
+
+      expect(scrollIntoView).toHaveBeenCalledTimes(1);
+      const target = scrollIntoView.mock.instances[0] as HTMLElement;
+      expect(target.getAttribute('data-word-row')).toBe('bat');
+    });
+  });
+
   test('delete asks for confirmation inline and only removes on confirm', () => {
     renderSortTable({ groups });
 
@@ -405,7 +492,9 @@ describe('SortTable', () => {
     fireEvent.click(confirmButton);
 
     expect(screen.queryByText('cat')).not.toBeInTheDocument();
-    expect(screen.getByText('ant')).toBeInTheDocument();
+    // Scoped to the table: 'ant' also appears in the save gate below it,
+    // which names the first blocking word as a jump-to button.
+    expect(within(screen.getByRole('table')).getByText('ant')).toBeInTheDocument();
   });
 
   test('cancelling a delete leaves the group intact', () => {

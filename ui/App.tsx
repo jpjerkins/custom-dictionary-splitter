@@ -24,13 +24,24 @@ const STEP_COMPONENTS: Record<StepName, ComponentType> = {
   commit: Step7Commit,
 };
 
+// The shell is a full-height flex column rather than a normal flowing page:
+// Step 3 is a dense table that has to fill whatever vertical space the
+// chrome leaves, and pinning its column headers requires a scroll container
+// with a bounded height. Expressing that as a flex chain
+// (.wizard-main > .wizard-step > .panel-fill > .sort-step >
+// .sort-table-scroll, each flex:1 min-height:0) means the table measures the
+// leftover space itself instead of a hard-coded viewport subtraction that
+// silently goes wrong whenever a banner appears or the title rewraps.
+// The other six steps just scroll inside .wizard-step as usual.
 function WizardShell() {
   const { currentStep } = useWizard();
   const StepComponent = STEP_COMPONENTS[currentStep];
   return (
-    <main style={{ padding: 'var(--space-6)', maxWidth: 720 }}>
-      <h1>Custom Dictionary Splitter</h1>
-      <StepComponent />
+    <main className="wizard-main">
+      <h1 className="wizard-title">Custom Dictionary Splitter</h1>
+      <div className="wizard-step">
+        <StepComponent />
+      </div>
     </main>
   );
 }

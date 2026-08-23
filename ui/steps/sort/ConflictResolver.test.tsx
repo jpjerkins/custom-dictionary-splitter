@@ -27,6 +27,7 @@ describe('ConflictResolver', () => {
         chord={conflictChord('6-main.json')}
         priority={priority}
         protectedFiles={protectedFiles}
+        destinationFile={null}
         onChange={() => {}}
       />
     );
@@ -46,6 +47,7 @@ describe('ConflictResolver', () => {
         chord={conflictChord('6-main.json')}
         priority={priority}
         protectedFiles={protectedFiles}
+        destinationFile={null}
         onChange={() => {}}
       />
     );
@@ -60,6 +62,7 @@ describe('ConflictResolver', () => {
         chord={conflictChord('2-other.json')}
         priority={priority}
         protectedFiles={protectedFiles}
+        destinationFile={null}
         onChange={() => {}}
       />
     );
@@ -69,7 +72,69 @@ describe('ConflictResolver', () => {
     }
   });
 
+  // The target file is the word's radio row (the `destinationFile` prop),
+  // not a dropdown in this box — there is deliberately only one control on
+  // the screen that files a word. These two tests are what stops that
+  // dropdown quietly coming back.
+  test('offers no target-file picker of its own', () => {
+    render(
+      <ConflictResolver
+        word="ant"
+        chord={conflictChord('2-other.json')}
+        priority={priority}
+        protectedFiles={protectedFiles}
+        destinationFile={null}
+        onChange={() => {}}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: /override/i }));
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+  });
+
   test('an override target that cannot outrank the shadowed file is rejected with a message', () => {
+    const onChange = vi.fn();
+    // 4-phil-nav.json sorts after 2-other.json in `priority`, so it cannot
+    // outrank the shadowed file — the UI must say why, not silently accept it.
+    const { rerender } = render(
+      <ConflictResolver
+        word="ant"
+        chord={conflictChord('2-other.json')}
+        priority={priority}
+        protectedFiles={protectedFiles}
+        destinationFile="4-phil-nav.json"
+        onChange={onChange}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('radio', { name: /override/i }));
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/outrank/i);
+    // And it must not report this as a resolved conflict.
+    expect(onChange).toHaveBeenLastCalledWith(null);
+
+    // Moving the word's radio to a file that does outrank it clears the
+    // error and resolves the conflict — no second control involved.
+    rerender(
+      <ConflictResolver
+        word="ant"
+        chord={conflictChord('2-other.json')}
+        priority={priority}
+        protectedFiles={protectedFiles}
+        destinationFile="1-personal.json"
+        onChange={onChange}
+      />
+    );
+
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith({
+      kind: 'override',
+      targetFile: '1-personal.json',
+      newStroke: undefined,
+    });
+  });
+
+  test('with no radio picked, override points the user at the dictionary columns', () => {
     const onChange = vi.fn();
     render(
       <ConflictResolver
@@ -77,30 +142,17 @@ describe('ConflictResolver', () => {
         chord={conflictChord('2-other.json')}
         priority={priority}
         protectedFiles={protectedFiles}
+        destinationFile={null}
         onChange={onChange}
       />
     );
 
     fireEvent.click(screen.getByRole('radio', { name: /override/i }));
-    fireEvent.change(screen.getByRole('combobox', { name: /override target file/i }), {
-      target: { value: '4-phil-nav.json' },
-    });
 
-    // 4-phil-nav.json sorts after 2-other.json in `priority`, so it cannot
-    // outrank the shadowed file — the UI must say why, not silently accept it.
-    expect(screen.getByRole('alert')).toHaveTextContent(/outrank/i);
-    // And it must not report this as a resolved conflict.
+    // The domain wording ("override requires a target file") describes a
+    // control this box no longer has; the screen must name the one it does.
+    expect(screen.getByRole('alert')).toHaveTextContent(/destination dictionary/i);
     expect(onChange).toHaveBeenLastCalledWith(null);
-
-    fireEvent.change(screen.getByRole('combobox', { name: /override target file/i }), {
-      target: { value: '1-personal.json' },
-    });
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(onChange).toHaveBeenLastCalledWith({
-      kind: 'override',
-      targetFile: '1-personal.json',
-      newStroke: undefined,
-    });
   });
 
   test('Save is disabled while any conflict is unresolved, and enabled once all are resolved', () => {

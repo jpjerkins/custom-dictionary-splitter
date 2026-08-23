@@ -178,6 +178,168 @@ describe('SortTable', () => {
     expect(antPersonalRadio.checked).toBe(false);
   });
 
+  // The conflict box has no target-file dropdown any more — the word's radio
+  // row is the only control that files it. These cover the seam that move
+  // created: an auto-preselected `override` has to arrive with a valid
+  // destination already ticked, or it would block Save on a choice the UI
+  // made for the user.
+  describe('override target comes from the radio row', () => {
+    const protectedConflict: WordGroup[] = [
+      {
+        word: 'ant',
+        existingChords: [],
+        newChords: [
+          { stroke: 'SPWANT', kind: 'chord-taken', diskWord: 'aunt', diskFile: '6-main.json', resolution: null },
+        ],
+        destinationFile: null,
+        invariantWarning: null,
+        priorityWarning: null,
+      },
+    ];
+
+    test('a conflict shadowed by a protected file arrives with a valid destination ticked, and Save unblocked', () => {
+      renderSortTable({ groups: protectedConflict });
+
+      // 6-main.json is protected, so `override` is preselected. priority is
+      // ['6-main.json', '1-personal.json', '9-misc.json'], so the only
+      // writable file that outranks 6-main.json is... none of them by index.
+      // 1-personal.json ranks BELOW 6-main.json here, so no valid target
+      // exists and the row must stay blocked rather than silently no-op.
+      expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
+    });
+
+    test('picks the highest-priority writable file that outranks the shadowed one', () => {
+      // 1-personal.json now outranks the protected 6-main.json, so it is a
+      // legitimate override target and must be preselected.
+      renderSortTable({
+        groups: protectedConflict,
+        priority: ['1-personal.json', '9-misc.json', '6-main.json'],
+        protectedFiles: ['6-main.json'],
+      });
+
+      const picked = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+        (radio) => radio.getAttribute('name') === 'ant'
+      ) as HTMLInputElement;
+      expect(picked.checked).toBe(true);
+      expect(screen.getByRole('button', { name: /save/i })).not.toBeDisabled();
+    });
+
+    test('a destination already preset by /api/classify is never overwritten', () => {
+      renderSortTable({
+        groups: [{ ...protectedConflict[0]!, destinationFile: '9-misc.json' }],
+        priority: ['1-personal.json', '9-misc.json', '6-main.json'],
+        protectedFiles: ['6-main.json'],
+      });
+
+      const preset = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'ant'
+      ) as HTMLInputElement;
+      expect(preset.checked).toBe(true);
+    });
+  });
+
+  // Green = the user filed this word; yellow = it's sitting on a filing the
+  // app chose for them; neutral = still needs a decision. The distinction is
+  // provenance, not completeness, so these assert the CLASS on the row
+  // rather than any rendered colour (jsdom computes no CSS).
+  describe('row status tint', () => {
+    function rowClassesFor(word: string): string[] {
+      return screen
+        .getAllByRole('row')
+        .filter((row) => within(row).queryByText(word) !== null)
+        .map((row) => row.className);
+    }
+
+    test('a word preset by /api/classify reads as suggested, not decided', () => {
+      renderSortTable({ groups });
+
+      // 'cat' arrives with destinationFile: '1-personal.json' from the API.
+      for (const className of rowClassesFor('cat')) {
+        expect(className).toContain('word-group-row-suggested');
+        expect(className).not.toContain('word-group-row-decided');
+      }
+    });
+
+    test('a word with nothing chosen stays neutral', () => {
+      renderSortTable({ groups });
+
+      // 'ant' arrives with destinationFile: null and an unresolved conflict
+      // against 9-misc.json, which is not protected — so no override is
+      // preselected and nothing has been suggested.
+      for (const className of rowClassesFor('ant')) {
+        expect(className).not.toContain('word-group-row-suggested');
+        expect(className).not.toContain('word-group-row-decided');
+      }
+    });
+
+    test('clicking a radio flips that word to decided, and only that word', () => {
+      renderSortTable({ groups });
+
+      const antRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+        (radio) => radio.getAttribute('name') === 'ant'
+      ) as HTMLInputElement;
+      fireEvent.click(antRadio);
+
+      for (const className of rowClassesFor('ant')) {
+        expect(className).toContain('word-group-row-decided');
+      }
+      // 'cat' was not touched, so it must still read as merely suggested.
+      for (const className of rowClassesFor('cat')) {
+        expect(className).toContain('word-group-row-suggested');
+        expect(className).not.toContain('word-group-row-decided');
+      }
+    });
+
+    test('confirming the suggested file still counts as deciding', () => {
+      renderSortTable({ groups });
+
+      // Re-picking what was already suggested is a confirmation, not a no-op.
+      const catRadio = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(catRadio);
+
+      for (const className of rowClassesFor('cat')) {
+        expect(className).toContain('word-group-row-decided');
+      }
+    });
+
+    test('an auto-preselected override stays yellow until the user touches it', () => {
+      // The trap this guards: ConflictResolver reports its preselected
+      // override through onChange from a MOUNT EFFECT. If that data signal
+      // were treated as intent, every protected-file conflict would render
+      // green on first paint without the user doing anything.
+      renderSortTable({
+        groups: [
+          {
+            word: 'ant',
+            existingChords: [],
+            newChords: [
+              { stroke: 'SPWANT', kind: 'chord-taken', diskWord: 'aunt', diskFile: '6-main.json', resolution: null },
+            ],
+            destinationFile: null,
+            invariantWarning: null,
+            priorityWarning: null,
+          },
+        ],
+        priority: ['1-personal.json', '9-misc.json', '6-main.json'],
+        protectedFiles: ['6-main.json'],
+      });
+
+      expect(screen.getByRole('radio', { name: /override/i })).toBeChecked();
+      for (const className of rowClassesFor('ant')) {
+        expect(className).toContain('word-group-row-suggested');
+        expect(className).not.toContain('word-group-row-decided');
+      }
+
+      // Picking a resolution by hand is intent, and flips it green.
+      fireEvent.click(screen.getByRole('radio', { name: /keep on-disk word/i }));
+      for (const className of rowClassesFor('ant')) {
+        expect(className).toContain('word-group-row-decided');
+      }
+    });
+  });
+
   test('delete asks for confirmation inline and only removes on confirm', () => {
     renderSortTable({ groups });
 

@@ -7,41 +7,51 @@
  */
 
 :root {
-  /* Surfaces */
-  --color-bg: #f5f6f8;
+  /* Surfaces — blue-tinted neutrals, not warm grey */
+  --color-bg: #eef2fa;
   --color-surface: #ffffff;
-  --color-surface-alt: #eceef2;
+  --color-surface-alt: #dfe7f6;
   --color-surface-raised: #ffffff;
 
   /* Borders / dividers */
-  --color-border: #d6dae1;
-  --color-border-strong: #b9bfc9;
+  --color-border: #c5d3ea;
+  --color-border-strong: #9db2d6;
 
   /* Text */
-  --color-text: #1b1f27;
-  --color-text-muted: #5b6270;
-  --color-text-faint: #8a909c;
+  --color-text: #101a2e;
+  --color-text-muted: #4a5a75;
+  --color-text-faint: #7d8ca8;
   --color-text-on-accent: #ffffff;
 
   /* Brand / accent */
-  --color-accent: #2f6fed;
-  --color-accent-hover: #2559c4;
-  --color-accent-muted: #dbe6ff;
+  --color-accent: #1d5fd6;
+  --color-accent-hover: #1749a8;
+  --color-accent-muted: #d6e3ff;
 
-  /* Status */
+  /* Status. Warnings are RED, not amber: in a blue-based UI an amber
+     banner read as decorative rust rather than as something to act on.
+     --color-warning is the deeper brick red (advisory: conflicts to
+     resolve, split notices); --color-danger is the brighter red reserved
+     for a real failure (a save that errored, an invalid choice). */
   --color-success: #1f9254;
   --color-success-muted: #dcf3e7;
-  --color-warning: #b9770e;
-  --color-warning-muted: #fbecd2;
+  --color-warning: #b23a34;
+  --color-warning-muted: #f9e2e0;
   --color-danger: #d13c3c;
   --color-danger-muted: #fbdede;
 
+  /* Row status on the sort table: yellow = the app suggested this filing,
+     green = the user chose it. Distinct from --color-warning (now red) so
+     "we guessed for you" never reads as "something is wrong". */
+  --color-suggest: #8a6d00;
+  --color-suggest-muted: #fbf1cf;
+
   /* Table row striping (dense entry tables) */
-  --color-row-alt: #f7f8fa;
-  --color-row-hover: #eef2fb;
+  --color-row-alt: #f4f7fd;
+  --color-row-hover: #e2ecff;
 
   /* Focus ring */
-  --color-focus-ring: #2f6fed;
+  --color-focus-ring: #1d5fd6;
 
   /* Shadows */
   --shadow-elevated: 0 4px 12px rgba(20, 24, 32, 0.08);
@@ -66,41 +76,45 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    /* Surfaces */
-    --color-bg: #14161c;
-    --color-surface: #1c1f27;
-    --color-surface-alt: #242833;
-    --color-surface-raised: #262a35;
+    /* Surfaces — dark blue, not neutral charcoal */
+    --color-bg: #0d131f;
+    --color-surface: #151d2c;
+    --color-surface-alt: #1e2939;
+    --color-surface-raised: #202b3d;
 
     /* Borders / dividers */
-    --color-border: #343a48;
-    --color-border-strong: #454c5e;
+    --color-border: #2c3a52;
+    --color-border-strong: #3d5075;
 
     /* Text */
-    --color-text: #e8eaf0;
-    --color-text-muted: #a5abba;
-    --color-text-faint: #767d8d;
+    --color-text: #e6ecf7;
+    --color-text-muted: #a0b0c8;
+    --color-text-faint: #71809a;
     --color-text-on-accent: #ffffff;
 
     /* Brand / accent — lifted brightness/saturation to read on dark */
-    --color-accent: #6f9bff;
-    --color-accent-hover: #8caeff;
-    --color-accent-muted: #26325a;
+    --color-accent: #6fa0ff;
+    --color-accent-hover: #92b8ff;
+    --color-accent-muted: #1e3560;
 
-    /* Status */
+    /* Status — see the light-mode note: warnings are red, not amber. */
     --color-success: #4fd08a;
     --color-success-muted: #163826;
-    --color-warning: #f0b74f;
-    --color-warning-muted: #3d2f10;
+    --color-warning: #f0938c;
+    --color-warning-muted: #3a2020;
     --color-danger: #f47272;
     --color-danger-muted: #3d1c1c;
 
+    /* Sort-table row status — see the light-mode note. */
+    --color-suggest: #e8c56a;
+    --color-suggest-muted: #332c12;
+
     /* Table row striping */
-    --color-row-alt: #20232c;
-    --color-row-hover: #262c3d;
+    --color-row-alt: #1a2231;
+    --color-row-hover: #22304a;
 
     /* Focus ring */
-    --color-focus-ring: #8caeff;
+    --color-focus-ring: #92b8ff;
 
     /* Shadows */
     --shadow-elevated: 0 4px 16px rgba(0, 0, 0, 0.45);
@@ -153,12 +167,65 @@ select {
 /* Utility classes used by the sample shell in App.tsx and, later,
    the dense entry table. */
 
+/* Wizard shell: a full-height flex column, not a flowing page. See
+   App.tsx's WizardShell comment for why. `overflow: hidden` here is what
+   stops the body scrolling sideways — wide content scrolls inside its own
+   container (.sort-table-scroll) instead of pushing the page out. */
+.wizard-main {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
+}
+
+/* Deliberately understated: on the sort step every pixel above the table is
+   a word the user can't see, and the app's own name is the least useful
+   thing on screen once you're three steps in. */
+.wizard-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+/* The active step's slot. min-height: 0 is load-bearing — without it a flex
+   item refuses to shrink below its content height and the chain silently
+   falls back to growing the page. */
+.wizard-step {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+
 .panel {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-4);
   box-shadow: var(--shadow-elevated);
+}
+
+/* Opt-in for a step that fills the viewport instead of flowing (Step 3).
+   Its own overflow is hidden because the scrolling happens further in, at
+   .sort-table-scroll, which is what the sticky headers stick to. */
+.panel-fill {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: var(--space-3);
+}
+
+.step-title {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .text-muted {
@@ -246,12 +313,63 @@ select {
 }
 
 /* Sort step: the word-grouped table of radio columns. Wrapping it in its
-   own overflow-x container keeps the page body from scrolling sideways
-   when there are eight-plus dictionary columns. */
+   own overflow container keeps the page body from scrolling sideways when
+   there are eight-plus dictionary columns.
+
+   It scrolls VERTICALLY too, rather than letting the page scroll, so the
+   column headers can stick: `position: sticky` resolves against the
+   nearest scrolling ancestor, and the overflow-x here already makes this
+   element that ancestor — sticking to the viewport instead is simply not
+   available while this container scrolls at all.
+
+   Its height comes from `flex: 1` at the end of the .wizard-main chain, not
+   from a viewport calc: the leftover space is whatever the title, step
+   heading, any device/split banners, and the Save row didn't use, and only
+   the browser can measure that. */
 .sort-table-scroll {
-  overflow-x: auto;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+/* The last link in the chain above: banners and the Save row size to
+   content, the table scroll area takes the rest. */
+.sort-step {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The trailing save-status line. A default <p> margin here costs ~30px of
+   table height for a line that is empty most of the time. Scoped to
+   :last-child so it doesn't also flatten .device-banner, which is a <p>
+   child of .sort-step too but never the last one. */
+.sort-step > p:last-child {
+  margin: var(--space-1) 0 0;
+  flex-shrink: 0;
+}
+
+/* Pinned column headers: with eight-plus dictionaries it's otherwise
+   impossible to tell which radio column is which file halfway down the
+   list. The rotated .dict-header labels ride along unchanged. */
+.sort-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-surface);
+  /* border-collapse drops real borders on sticky cells (the border belongs
+     to the collapsed grid, which scrolls away) — an inset shadow is painted
+     by the cell itself and stays put. */
+  box-shadow: inset 0 -1px 0 var(--color-border-strong);
+}
+
+/* Higher specificity than the rule above so protected columns keep their
+   receded tint instead of being repainted with the plain surface colour. */
+.sort-table thead th.dict-header-protected {
+  background: var(--color-surface-alt);
 }
 
 .sort-table {
@@ -295,6 +413,31 @@ select {
   vertical-align: bottom;
   color: var(--color-text-muted);
   font-weight: 600;
+}
+
+/* Row status: green once the user has actively filed a word, yellow while
+   it is still sitting on a filing the app suggested (a /api/classify preset
+   or an auto-preselected override). Untouched words stay neutral, so the
+   eye lands on what still needs a decision.
+
+   The tint is painted on the <td>s, not the <tr>: a <tr> background loses
+   to .entry-table's zebra striping and :hover rules, both of which also
+   target <tr>. A word spans several <tr>s (one per chord), so the class is
+   on every row of the group and the whole block tints together. */
+.sort-table tbody tr.word-group-row-decided > td {
+  background: var(--color-success-muted);
+}
+
+.sort-table tbody tr.word-group-row-decided > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-success);
+}
+
+.sort-table tbody tr.word-group-row-suggested > td {
+  background: var(--color-suggest-muted);
+}
+
+.sort-table tbody tr.word-group-row-suggested > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-suggest);
 }
 
 /* One <tr> per chord; existing on-disk chords are visually receded so it's
@@ -440,12 +583,24 @@ select {
   font-weight: 600;
 }
 
+/* Echoes where an override/re-chord will actually land. The target used to
+   be a dropdown inside this box; now it's the word's radio row several
+   columns to the right, so the choice has to be restated where the decision
+   is being made. */
+.conflict-target {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+}
+
 /* Save gate below the sort table. */
 .sort-table-actions {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  margin-top: var(--space-4);
+  margin-top: var(--space-2);
+  /* Never let the Save row be squeezed out by the table above it. */
+  flex-shrink: 0;
 }
 
 .sort-table-save-reason {

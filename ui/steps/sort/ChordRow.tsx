@@ -17,7 +17,9 @@ export default function ChordRow({
   chord,
   priority,
   protectedFiles,
+  destinationFile,
   onResolve,
+  onUserResolve,
   saveError,
   editConflict,
   onEditStrokeDraft,
@@ -32,7 +34,13 @@ export default function ChordRow({
   chord?: NewChord;
   priority?: string[];
   protectedFiles?: string[];
+  // The word's radio pick, forwarded to ConflictResolver as the override /
+  // re-chord target — that box no longer has a file picker of its own.
+  destinationFile?: string | null;
   onResolve?: (resolution: ResolutionChoice | null) => void;
+  // See ConflictResolver's onUserChoice: the intent signal, as opposed to
+  // onResolve's data signal which also fires on mount.
+  onUserResolve?: () => void;
   saveError?: string;
   editConflict?: string;
   onEditStrokeDraft?: (candidate: string) => void;
@@ -90,7 +98,9 @@ export default function ChordRow({
           chord={chord}
           priority={priority}
           protectedFiles={protectedFiles}
+          destinationFile={destinationFile ?? null}
           onChange={onResolve}
+          onUserChoice={onUserResolve}
         />
       )}
       {!existing && editConflict && (

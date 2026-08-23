@@ -2,7 +2,7 @@ import { useState } from 'react';
 import WordGroupRow from './WordGroupRow.tsx';
 import type { WordGroup } from './types.ts';
 import type { MovedEntry } from './retry.ts';
-import { hasUnresolvedConflicts, RESOLUTIONS } from '../../resolutions.ts';
+import { hasUnresolvedConflicts, RESOLUTIONS, defaultResolution, outranks } from '../../resolutions.ts';
 import { useWizard } from '../../state/WizardContext.tsx';
 
 // One resolved write, ready to post to /api/save, plus enough of its origin
@@ -97,6 +97,59 @@ function buildDecisions(
   }
 
   return { decisions, noOpKeys };
+}
+
+// ConflictResolver used to own this: when it auto-preselected `override`
+// (because the shadowed on-disk entry sits in a protected file), it also
+// silently filled its own Target file dropdown with a file that actually
+// outranked the shadow, so the preselection arrived valid rather than
+// half-done. That dropdown is gone — the target is now the word's radio row
+// — so the same courtesy has to be applied out here, to the group's
+// destinationFile. Without it every protected-file conflict would land
+// pre-blocked, asking the user to pick a destination for a resolution the
+// UI chose on their behalf.
+//
+// Only ever fills a destination that is still null: a preset from
+// /api/classify (buildWordGroups) always wins.
+function presetOverrideDestinations(
+  groups: WordGroup[],
+  priority: string[],
+  protectedFiles: string[]
+): WordGroup[] {
+  const writableFiles = priority.filter((f) => !protectedFiles.includes(f));
+
+  return groups.map((group) => {
+    if (group.destinationFile) return group;
+
+    const shadowed = group.newChords.find(
+      (chord) =>
+        (chord.kind === 'chord-taken' || chord.kind === 'both') &&
+        chord.diskFile !== undefined &&
+        defaultResolution({
+          entry: { stroke: chord.stroke, word: group.word, diskFile: chord.diskFile },
+          priority,
+          protectedFiles,
+        }) === 'override'
+    );
+    if (!shadowed?.diskFile) return group;
+
+    // priority is highest-first, so the first writable file that outranks
+    // the shadowed one is also the highest-priority valid target.
+    const target = writableFiles.find((f) => outranks(priority, f, shadowed.diskFile!));
+    return target ? { ...group, destinationFile: target } : group;
+  });
+}
+
+// Words arriving with a filing nobody chose: either /api/classify preset a
+// destinationFile (buildWordGroups picks the highest-priority file the word
+// already lives in), or presetOverrideDestinations above just filled one in
+// for an auto-preselected override. Those render yellow until the user
+// touches them; see `rowStatus` in the component.
+//
+// Snapshotted once, from the ALREADY-preset groups, so it captures the
+// state the screen actually opened in.
+function findSuggestedWords(groups: WordGroup[]): Set<string> {
+  return new Set(groups.filter((group) => group.destinationFile !== null).map((group) => group.word));
 }
 
 // Client-side-only collision check for chord editing: does `candidate`
@@ -194,13 +247,33 @@ export default function SortTable({
   deviceMissingFiles?: string[];
 }) {
   const { state, setState, goToStep } = useWizard();
-  const [groups, setGroups] = useState(initialGroups);
+  const [groups, setGroups] = useState(() =>
+    presetOverrideDestinations(initialGroups, priority, protectedFiles)
+  );
+  // Row status. `suggestedWords` is a mount-time snapshot and never changes;
+  // `decidedWords` grows as the user acts. Green (decided) beats yellow
+  // (suggested), so re-picking the file that was already suggested still
+  // counts as confirming it.
+  // Reads `groups` (not initialGroups) so it sees the presets applied above:
+  // both useState initializers run on the same first render, and `groups` is
+  // already bound by the time this one executes.
+  const [suggestedWords] = useState(() => findSuggestedWords(groups));
+  const [decidedWords, setDecidedWords] = useState<Set<string>>(() => new Set());
   const [saveStatus, setSaveStatus] = useState('');
   // Set when a radio pick would split a word across files (it already has
   // chords in some OTHER file): offers "move all" (POST /api/move-word) vs
   // "split anyway" (just file the new chord there, leave the rest where it is).
   const [splitPrompt, setSplitPrompt] = useState<{ word: string; toFile: string; fromFiles: string[] } | null>(null);
   const [moveStatus, setMoveStatus] = useState('');
+
+  // Called only from genuine user interaction — never from a component's
+  // mount effect. ConflictResolver in particular fires its onChange once on
+  // mount to report an auto-preselected override, which is a suggestion,
+  // not a decision; that's why it has a separate onUserChoice callback and
+  // why handleResolveChord below does NOT mark the word decided.
+  function markDecided(word: string) {
+    setDecidedWords((prev) => (prev.has(word) ? prev : new Set(prev).add(word)));
+  }
 
   function handleResolveChord(
     word: string,
@@ -226,6 +299,10 @@ export default function SortTable({
   }
 
   function handleSelectDestination(word: string, file: string) {
+    // Reached only from a radio's onChange, so the intent is unambiguous —
+    // mark it decided even if the split prompt below defers the actual
+    // filing, since the user has still engaged with this word.
+    markDecided(word);
     const group = groups.find((g) => g.word === word);
     const existingFiles = group ? Array.from(new Set(group.existingChords.map((c) => c.file))) : [];
     // Only prompt when the word already lives somewhere else — picking the
@@ -343,6 +420,7 @@ export default function SortTable({
   }
 
   function handleCommitStroke(word: string, originalStroke: string, candidate: string) {
+    markDecided(word);
     const trimmed = candidate.trim();
     const collidingWord = trimmed ? findStrokeCollision(groups, word, originalStroke, trimmed) : null;
     setGroups((prev) =>
@@ -557,7 +635,15 @@ export default function SortTable({
                   group={group}
                   priority={priority}
                   protectedFiles={protectedFiles}
+                  status={
+                    decidedWords.has(group.word)
+                      ? 'decided'
+                      : suggestedWords.has(group.word)
+                        ? 'suggested'
+                        : null
+                  }
                   onResolveChord={handleResolveChord}
+                  onUserAction={markDecided}
                   onSelectDestination={handleSelectDestination}
                   onDeleteWord={handleDeleteWord}
                   onEditStrokeDraft={handleEditStrokeDraft}

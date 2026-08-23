@@ -33,9 +33,11 @@ export default function Step3Sort() {
     return { kind: 'retry', rows: buildRetryRows(failedChecklistRows, state.movedEntries as MovedEntry[]) };
   });
 
+  // panel-fill: this step's table has to claim the leftover viewport height
+  // rather than grow the page (see WizardShell's comment).
   return (
-    <section className="panel">
-      <h2 style={{ marginTop: 0 }}>3. Sort New &amp; Conflicting Entries</h2>
+    <section className="panel panel-fill">
+      <h2 className="step-title">3. Sort New &amp; Conflicting Entries</h2>
       {mode.kind === 'retry' ? <RetryTable rows={mode.rows} /> : <ClassifySort />}
     </section>
   );

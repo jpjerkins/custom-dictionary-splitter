@@ -19,7 +19,9 @@ export default function WordGroupRow({
   group,
   priority,
   protectedFiles,
+  status,
   onResolveChord,
+  onUserAction,
   onSelectDestination,
   onDeleteWord,
   onEditStrokeDraft,
@@ -30,7 +32,18 @@ export default function WordGroupRow({
   group: WordGroup;
   priority: string[];
   protectedFiles: string[];
+  // 'decided' (green) once the user has acted on this word, 'suggested'
+  // (yellow) while it still sits on a filing the app chose, null otherwise.
+  // Computed by SortTable, which owns both sets.
+  status: 'decided' | 'suggested' | null;
   onResolveChord: (word: string, stroke: string, resolution: ResolutionChoice | null) => void;
+  // "The user did something to this word" — the intent signal behind the
+  // green tint, deliberately separate from the data callbacks. Needed
+  // because neither data path reports a confirmation: onResolveChord also
+  // fires from ConflictResolver's mount effect (a suggestion, not a
+  // decision), and a radio's onChange does not fire at all when the user
+  // clicks the option that is already checked.
+  onUserAction: (word: string) => void;
   onSelectDestination: (word: string, file: string) => void;
   onDeleteWord: (word: string) => void;
   onEditStrokeDraft: (word: string, originalStroke: string, candidate: string) => void;
@@ -67,10 +80,20 @@ export default function WordGroupRow({
   const rowCount = rows.length;
   const warnings = [invariantWarning, priorityWarning].filter((w): w is string => w !== null);
 
+  // The status tint goes on EVERY <tr> of the group, not just the first, so
+  // a multi-chord word reads as one coloured block rather than a tinted
+  // header row above untinted ones.
+  const statusClass = status === null ? '' : ` word-group-row-${status}`;
+
   return (
     <>
       {rows.map((row, i) => (
-        <tr key={row.key} className={row.existing ? 'word-group-row word-group-row-existing' : 'word-group-row'}>
+        <tr
+          key={row.key}
+          className={
+            (row.existing ? 'word-group-row word-group-row-existing' : 'word-group-row') + statusClass
+          }
+        >
           <ChordRow
             word={group.word}
             stroke={row.stroke}
@@ -81,7 +104,9 @@ export default function WordGroupRow({
             chord={row.existing ? undefined : row.chord}
             priority={row.existing ? undefined : priority}
             protectedFiles={row.existing ? undefined : protectedFiles}
+            destinationFile={row.existing ? undefined : group.destinationFile}
             onResolve={row.existing ? undefined : (resolution) => onResolveChord(group.word, row.stroke, resolution)}
+            onUserResolve={row.existing ? undefined : () => onUserAction(group.word)}
             saveError={row.existing ? undefined : row.chord?.saveError}
             editConflict={row.existing ? undefined : row.chord?.editConflict}
             onEditStrokeDraft={
@@ -117,6 +142,12 @@ export default function WordGroupRow({
                       disabled={isProtected}
                       checked={!isProtected && group.destinationFile === file}
                       onChange={() => onSelectDestination(group.word, file)}
+                      // onClick, not onChange: clicking the radio that is
+                      // already checked fires no change event, so confirming
+                      // the app's suggestion would otherwise be invisible.
+                      // Fires alongside onChange on a genuine change too;
+                      // marking a word decided twice is a no-op.
+                      onClick={() => onUserAction(group.word)}
                     />
                   </td>
                 );

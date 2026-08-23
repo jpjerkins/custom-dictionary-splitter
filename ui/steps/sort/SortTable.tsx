@@ -133,9 +133,18 @@ function presetOverrideDestinations(
     );
     if (!shadowed?.diskFile) return group;
 
-    // priority is highest-first, so the first writable file that outranks
-    // the shadowed one is also the highest-priority valid target.
-    const target = writableFiles.find((f) => outranks(priority, f, shadowed.diskFile!));
+    // Win by the smallest margin that works: of the writable files that
+    // outrank the shadowed one, take the LAST in priority order — the one
+    // sitting immediately above it. priority is highest-first, so that is
+    // the closest, not the strongest.
+    //
+    // Taking the first instead put every 6-main.json override into
+    // 1-bible.json purely because it sorts first, which is both a strange
+    // home for an override and shadows everything in between. The nearest
+    // file above the shadowed one is the least surprising default (here,
+    // 5-user.json).
+    const candidates = writableFiles.filter((f) => outranks(priority, f, shadowed.diskFile!));
+    const target = candidates[candidates.length - 1];
     return target ? { ...group, destinationFile: target } : group;
   });
 }
@@ -150,6 +159,19 @@ function presetOverrideDestinations(
 // state the screen actually opened in.
 function findSuggestedWords(groups: WordGroup[]): Set<string> {
   return new Set(groups.filter((group) => group.destinationFile !== null).map((group) => group.word));
+}
+
+// Is this word one of the ones stopping Save? Used for BOTH the red row
+// tint and the list of names in the save gate's message, so the thing that
+// blocks and the thing the screen points at can never disagree.
+//
+// hasUnresolvedConflicts is the hand-synced mirror of
+// src/domain/grouping.ts; calling it per-group reuses that rule rather than
+// re-implementing it here, keeping the drift tripwire alive. editConflict
+// is UI-only (a stroke edited into one already pending in this batch) and
+// has no domain counterpart.
+function isGroupBlocked(group: WordGroup): boolean {
+  return hasUnresolvedConflicts([group]) || group.newChords.some((chord) => chord.editConflict !== undefined);
 }
 
 // Client-side-only collision check for chord editing: does `candidate`
@@ -616,7 +638,8 @@ export default function SortTable({
     goToStep('empty');
   }
 
-  const blocked = hasUnresolvedConflicts(groups) || groups.some((group) => group.newChords.some((c) => c.editConflict));
+  const blockingWords = groups.filter(isGroupBlocked).map((group) => group.word);
+  const blocked = blockingWords.length > 0;
 
   return (
     <div className="sort-step">
@@ -689,12 +712,21 @@ export default function SortTable({
                   group={group}
                   priority={priority}
                   protectedFiles={protectedFiles}
+                  // 'blocked' outranks everything. The tint is per-WORD
+                  // while a conflict resolution is per-CHORD, so picking a
+                  // destination for a word whose conflict is still
+                  // unresolved would otherwise paint it green — the exact
+                  // failure that made a fully-green table refuse to save.
+                  // Green must mean "this word will be written", not merely
+                  // "the user touched this word".
                   status={
-                    decidedWords.has(group.word)
-                      ? 'decided'
-                      : suggestedWords.has(group.word)
-                        ? 'suggested'
-                        : null
+                    isGroupBlocked(group)
+                      ? 'blocked'
+                      : decidedWords.has(group.word)
+                        ? 'decided'
+                        : suggestedWords.has(group.word)
+                          ? 'suggested'
+                          : null
                   }
                   onResolveChord={handleResolveChord}
                   onUserAction={markDecided}
@@ -715,8 +747,13 @@ export default function SortTable({
           Save
         </button>
         {blocked && (
+          // Names the words rather than just stating the rule. "Resolve all
+          // chord conflicts before saving" is true but unactionable: with a
+          // few hundred rows in a scrolling container there is no way to
+          // find the handful that are blocking.
           <p className="sort-table-save-reason" role="status">
-            Resolve all chord conflicts before saving.
+            Resolve conflicts for: {blockingWords.slice(0, 3).join(', ')}
+            {blockingWords.length > 3 ? ` (and ${blockingWords.length - 3} more)` : ''}.
           </p>
         )}
       </div>

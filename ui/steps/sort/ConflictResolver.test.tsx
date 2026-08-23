@@ -175,11 +175,12 @@ describe('ConflictResolver', () => {
 
     const saveButton = screen.getByRole('button', { name: /save/i });
     expect(saveButton).toBeDisabled();
-    expect(screen.getByText(/resolve all chord conflicts/i)).toBeInTheDocument();
+    // The gate names the blocking word rather than restating the rule.
+    expect(screen.getByText(/Resolve conflicts for:.*\bant\b/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('radio', { name: /keep on-disk word/i }));
 
     expect(saveButton).not.toBeDisabled();
-    expect(screen.queryByText(/resolve all chord conflicts/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Resolve conflicts for:/i)).not.toBeInTheDocument();
   });
 });

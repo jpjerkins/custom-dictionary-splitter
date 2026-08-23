@@ -32,10 +32,11 @@ export default function WordGroupRow({
   group: WordGroup;
   priority: string[];
   protectedFiles: string[];
-  // 'decided' (green) once the user has acted on this word, 'suggested'
-  // (yellow) while it still sits on a filing the app chose, null otherwise.
-  // Computed by SortTable, which owns both sets.
-  status: 'decided' | 'suggested' | null;
+  // 'blocked' (red) while something about this word stops Save — it
+  // outranks the other two; 'decided' (green) once the user has filed it
+  // with nothing outstanding; 'suggested' (yellow) while it sits on a
+  // filing the app chose; null otherwise. Computed by SortTable.
+  status: 'blocked' | 'decided' | 'suggested' | null;
   onResolveChord: (word: string, stroke: string, resolution: ResolutionChoice | null) => void;
   // "The user did something to this word" — the intent signal behind the
   // green tint, deliberately separate from the data callbacks. Needed

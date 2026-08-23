@@ -415,15 +415,27 @@ select {
   font-weight: 600;
 }
 
-/* Row status: green once the user has actively filed a word, yellow while
-   it is still sitting on a filing the app suggested (a /api/classify preset
-   or an auto-preselected override). Untouched words stay neutral, so the
-   eye lands on what still needs a decision.
+/* Row status: red while the word is blocking Save, green once the user has
+   actively filed it with nothing outstanding, yellow while it is still
+   sitting on a filing the app suggested (a /api/classify preset or an
+   auto-preselected override). Untouched words stay neutral.
+
+   Red outranks the other two and is what makes green trustworthy: green
+   means "this word will be written", never merely "the user clicked
+   something on this row".
 
    The tint is painted on the <td>s, not the <tr>: a <tr> background loses
    to .entry-table's zebra striping and :hover rules, both of which also
    target <tr>. A word spans several <tr>s (one per chord), so the class is
    on every row of the group and the whole block tints together. */
+.sort-table tbody tr.word-group-row-blocked > td {
+  background: var(--color-warning-muted);
+}
+
+.sort-table tbody tr.word-group-row-blocked > td:first-child {
+  box-shadow: inset 3px 0 0 var(--color-warning);
+}
+
 .sort-table tbody tr.word-group-row-decided > td {
   background: var(--color-success-muted);
 }

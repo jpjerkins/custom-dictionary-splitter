@@ -208,19 +208,26 @@ describe('SortTable', () => {
       expect(screen.getByRole('button', { name: /save/i })).toBeDisabled();
     });
 
-    test('picks the highest-priority writable file that outranks the shadowed one', () => {
-      // 1-personal.json now outranks the protected 6-main.json, so it is a
-      // legitimate override target and must be preselected.
+    test('picks the writable file sitting immediately above the shadowed one', () => {
+      // Both 1-personal.json and 9-misc.json outrank the protected
+      // 6-main.json, so both are legitimate override targets. The default
+      // must be the NEAREST one above it (9-misc.json), not the
+      // highest-priority one — an override should win by the smallest
+      // margin that works rather than also shadowing everything between.
       renderSortTable({
         groups: protectedConflict,
         priority: ['1-personal.json', '9-misc.json', '6-main.json'],
         protectedFiles: ['6-main.json'],
       });
 
-      const picked = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+      const nearest = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
         (radio) => radio.getAttribute('name') === 'ant'
       ) as HTMLInputElement;
-      expect(picked.checked).toBe(true);
+      const strongest = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+        (radio) => radio.getAttribute('name') === 'ant'
+      ) as HTMLInputElement;
+      expect(nearest.checked).toBe(true);
+      expect(strongest.checked).toBe(false);
       expect(screen.getByRole('button', { name: /save/i })).not.toBeDisabled();
     });
 
@@ -260,19 +267,23 @@ describe('SortTable', () => {
       }
     });
 
-    test('a word with nothing chosen stays neutral', () => {
+    test('a word with an unresolved conflict reads as blocked', () => {
       renderSortTable({ groups });
 
-      // 'ant' arrives with destinationFile: null and an unresolved conflict
-      // against 9-misc.json, which is not protected — so no override is
-      // preselected and nothing has been suggested.
+      // 'ant' arrives with an unresolved conflict against 9-misc.json,
+      // which is not protected — so no override is preselected and nothing
+      // resolves it. It is what stops Save, so it must say so.
       for (const className of rowClassesFor('ant')) {
-        expect(className).not.toContain('word-group-row-suggested');
-        expect(className).not.toContain('word-group-row-decided');
+        expect(className).toContain('word-group-row-blocked');
       }
     });
 
-    test('clicking a radio flips that word to decided, and only that word', () => {
+    // THE REGRESSION. Filing a word is per-WORD; resolving a conflict is
+    // per-CHORD. Marking the word decided on a radio click painted it green
+    // while its conflict was still null, so a table where every row read
+    // "done" refused to save and named nothing. Green must mean "this word
+    // will be written", never "the user clicked something on this row".
+    test('picking a destination does NOT turn a word green while its conflict is unresolved', () => {
       renderSortTable({ groups });
 
       const antRadio = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
@@ -280,14 +291,54 @@ describe('SortTable', () => {
       ) as HTMLInputElement;
       fireEvent.click(antRadio);
 
+      expect(antRadio.checked).toBe(true);
       for (const className of rowClassesFor('ant')) {
-        expect(className).toContain('word-group-row-decided');
-      }
-      // 'cat' was not touched, so it must still read as merely suggested.
-      for (const className of rowClassesFor('cat')) {
-        expect(className).toContain('word-group-row-suggested');
+        expect(className).toContain('word-group-row-blocked');
         expect(className).not.toContain('word-group-row-decided');
       }
+      expect(screen.getByRole('button', { name: /^save$/i })).toBeDisabled();
+    });
+
+    test('resolving the conflict then releases the word to green', () => {
+      renderSortTable({ groups });
+
+      fireEvent.click(
+        screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+          (radio) => radio.getAttribute('name') === 'ant'
+        ) as HTMLInputElement
+      );
+      fireEvent.click(screen.getByRole('radio', { name: /keep on-disk word/i }));
+
+      for (const className of rowClassesFor('ant')) {
+        expect(className).toContain('word-group-row-decided');
+        expect(className).not.toContain('word-group-row-blocked');
+      }
+    });
+
+    test('clicking a radio flips a conflict-free word to decided, and only that word', () => {
+      renderSortTable({ groups });
+
+      // 'cat' has only a 'new' chord, so nothing blocks it.
+      const catRadio = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+        (radio) => radio.getAttribute('name') === 'cat'
+      ) as HTMLInputElement;
+      fireEvent.click(catRadio);
+
+      for (const className of rowClassesFor('cat')) {
+        expect(className).toContain('word-group-row-decided');
+      }
+      // 'ant' was not touched and is still blocked.
+      for (const className of rowClassesFor('ant')) {
+        expect(className).not.toContain('word-group-row-decided');
+      }
+    });
+
+    test('the save gate names the words that are blocking it', () => {
+      renderSortTable({ groups });
+
+      expect(screen.getByText(/Resolve conflicts for:.*\bant\b/)).toBeInTheDocument();
+      // 'cat' is not blocking, so it must not be named.
+      expect(screen.queryByText(/Resolve conflicts for:.*\bcat\b/)).not.toBeInTheDocument();
     });
 
     test('confirming the suggested file still counts as deciding', () => {

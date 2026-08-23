@@ -59,6 +59,70 @@ describe('Step6Test', () => {
     expect(screen.getByTestId('current-step').textContent).toBe('sort');
   });
 
+  test('rows are ordered by word, not by the order the writes happened', () => {
+    // movedEntries arrives grouped by destination file, which reads as
+    // random when working down a long list.
+    render(
+      <WizardProvider>
+        <Harness
+          movedEntries={[
+            { stroke: 'TPHOG', translation: 'dog' },
+            { stroke: 'STKPW', translation: 'zebra' },
+            { stroke: 'KAT', translation: 'cat' },
+            { stroke: 'K-T', translation: 'cat' },
+            { stroke: 'APL', translation: 'apple' },
+          ]}
+        />
+      </WizardProvider>,
+    );
+    fireEvent.click(screen.getByTestId('seed'));
+
+    const words = screen
+      .getAllByRole('row')
+      .slice(1) // drop the header row
+      .map((row) => row.querySelectorAll('td')[1]!.textContent);
+    expect(words).toEqual(['apple', 'cat', 'cat', 'dog', 'zebra']);
+
+    // Two chords for the same word tie on the word, so the stroke breaks it.
+    const strokes = screen
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => row.querySelectorAll('td')[0]!.textContent);
+    expect(strokes.slice(1, 3)).toEqual(['K-T', 'KAT']);
+  });
+
+  test('a stroked answer passes despite the leading space steno inserts', () => {
+    render(
+      <WizardProvider>
+        <Harness movedEntries={[{ stroke: 'KAT', translation: 'cat' }]} />
+      </WizardProvider>,
+    );
+    fireEvent.click(screen.getByTestId('seed'));
+
+    const box = screen.getByLabelText('Actual translation for KAT');
+    fireEvent.change(box, { target: { value: ' cat' } });
+
+    expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-pass')).not.toBeNull();
+    // The box still shows exactly what was typed.
+    expect((box as HTMLInputElement).value).toBe(' cat');
+  });
+
+  test('clearing a row returns it to pending rather than leaving it failed', () => {
+    render(
+      <WizardProvider>
+        <Harness movedEntries={[{ stroke: 'KAT', translation: 'cat' }]} />
+      </WizardProvider>,
+    );
+    fireEvent.click(screen.getByTestId('seed'));
+
+    const box = screen.getByLabelText('Actual translation for KAT');
+    fireEvent.change(box, { target: { value: 'dog' } });
+    expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-fail')).not.toBeNull();
+
+    fireEvent.change(box, { target: { value: '' } });
+    expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-pending')).not.toBeNull();
+  });
+
   test('all rows passing advances to Commit', () => {
     render(
       <WizardProvider>

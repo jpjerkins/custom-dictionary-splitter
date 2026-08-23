@@ -7,6 +7,12 @@
  */
 
 :root {
+  /* Tells the browser which way native controls should render — inputs,
+     scrollbars, the caret. Without it a dark-mode page still gets
+     light-mode form controls, so a light --color-text lands on a white
+     input background. Paired with the dark override below. */
+  color-scheme: light;
+
   /* Surfaces — blue-tinted neutrals, not warm grey */
   --color-bg: #eef2fa;
   --color-surface: #ffffff;
@@ -76,6 +82,8 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
+
     /* Surfaces — dark blue, not neutral charcoal */
     --color-bg: #0d131f;
     --color-surface: #151d2c;
@@ -162,6 +170,24 @@ input,
 select {
   font: inherit;
   color: var(--color-text);
+}
+
+/* Text inputs need an explicit background, not just a colour. Without one
+   they keep the browser's default white while --color-text is near-white in
+   dark mode — near-invisible text in the box. Several inputs already set
+   this individually (.chord-edit-input, .conflict-detail input); the Step 6
+   checklist boxes did not, which is where it showed. */
+input[type='text'],
+input:not([type]) {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1);
+}
+
+input::placeholder {
+  color: var(--color-text-faint);
 }
 
 /* Utility classes used by the sample shell in App.tsx and, later,

@@ -11,7 +11,19 @@ export default function Step6Test() {
   const { state, setState, goToStep } = useWizard();
   const [checklist, setChecklist] = useState<ChecklistRow[]>(() => {
     const previous = new Map((state.checklist as ChecklistRow[]).map((row) => [row.stroke, row]));
-    return buildTestChecklist(state.movedEntries as MovedEntry[]).map((row) => previous.get(row.stroke) ?? row);
+    return (
+      buildTestChecklist(state.movedEntries as MovedEntry[])
+        .map((row) => previous.get(row.stroke) ?? row)
+        // movedEntries arrives in whatever order the writes happened —
+        // grouped by destination file, which reads as random when working
+        // down a list of a hundred-plus rows. Sorted by word here rather
+        // than in buildTestChecklist, which is a hand-synced mirror of
+        // src/domain/testChecklist.ts: display order is this component's
+        // business and changing both copies to agree on it would be one
+        // more thing to keep in step. Stroke breaks ties, since two chords
+        // can produce the same word.
+        .sort((a, b) => a.expected.localeCompare(b.expected) || a.stroke.localeCompare(b.stroke))
+    );
   });
   const [status, setStatus] = useState('');
 

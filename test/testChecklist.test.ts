@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildTestChecklist, checkRow } from '../src/domain/testChecklist.ts';
+import { buildTestChecklist, checkRow, skipRow, isChecklistSettled } from '../src/domain/testChecklist.ts';
 
 test('buildTestChecklist creates a pending row per moved entry', () => {
   const checklist = buildTestChecklist([{ stroke: 'KAT', translation: 'cat' }]);
@@ -47,4 +47,34 @@ test('checkRow returns to pending when the box is emptied', () => {
 test('checkRow keeps the untrimmed text for display', () => {
   const row = { stroke: 'KAT', expected: 'cat', actual: '', status: 'pending' as const };
   assert.equal(checkRow(row, ' cat').actual, ' cat');
+});
+
+// Some entries cannot be tested by typing at all. Phil's dictionaries hold
+// Plover formatting entries like '{^`}' — stroking one emits a backtick,
+// never the literal text, so the row could never pass and would block
+// Step 7 forever.
+test('skipRow marks a row untestable', () => {
+  const row = { stroke: 'TR-RL', expected: '{^`}', actual: '', status: 'pending' as const };
+  assert.equal(skipRow(row).status, 'skipped');
+});
+
+test('typing into a skipped row re-tests it', () => {
+  const skipped = skipRow({ stroke: 'KAT', expected: 'cat', actual: '', status: 'pending' as const });
+  assert.equal(checkRow(skipped, 'cat').status, 'pass');
+  assert.equal(checkRow(skipped, 'dog').status, 'fail');
+  // Clearing it again leaves it pending, not stuck skipped.
+  assert.equal(checkRow(skipped, '').status, 'pending');
+});
+
+test('isChecklistSettled accepts passed and skipped rows, nothing else', () => {
+  const pass = { stroke: 'KAT', expected: 'cat', actual: 'cat', status: 'pass' as const };
+  const skipped = { stroke: 'TR-RL', expected: '{^`}', actual: '', status: 'skipped' as const };
+  const failed = { stroke: 'TPHOG', expected: 'dog', actual: 'cow', status: 'fail' as const };
+  const pending = { stroke: 'STKPW', expected: 'zebra', actual: '', status: 'pending' as const };
+
+  assert.equal(isChecklistSettled([pass, skipped]), true);
+  assert.equal(isChecklistSettled([pass, failed]), false);
+  assert.equal(isChecklistSettled([pass, pending]), false);
+  // An empty checklist is vacuously settled — there is nothing to test.
+  assert.equal(isChecklistSettled([]), true);
 });

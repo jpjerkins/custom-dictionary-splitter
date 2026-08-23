@@ -375,6 +375,19 @@ input::placeholder {
   color: var(--color-text-faint);
 }
 
+/* Deliberately receded: a skipped row is a decision not to test, which
+   should not compete for attention with rows that still need one. */
+.status-skipped {
+  color: var(--color-text-faint);
+  font-style: italic;
+}
+
+input:disabled {
+  background: var(--color-surface-alt);
+  color: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
 /* Sort step: the word-grouped table of radio columns. Wrapping it in its
    own overflow container keeps the page body from scrolling sideways when
    there are eight-plus dictionary columns.

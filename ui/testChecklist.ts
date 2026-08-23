@@ -3,7 +3,12 @@
 // (see .superpowers/sdd/2026-08-22-typescript-overrides-react task 18/19
 // briefs), so this pure logic is kept in sync by hand rather than shared.
 
-export type ChecklistStatus = 'pending' | 'pass' | 'fail';
+// 'skipped' means untestable, not untested: some dictionary values cannot be
+// produced by typing at all. A Plover formatting entry like '{^`}' emits a
+// backtick when stroked, never its own literal text, so the row can never
+// pass — and since Step 7 is gated on the whole checklist, one of them would
+// block the run forever.
+export type ChecklistStatus = 'pending' | 'pass' | 'fail' | 'skipped';
 
 export interface MovedEntry {
   stroke: string;
@@ -46,4 +51,17 @@ export function checkRow(row: ChecklistRow, actualValue: string): ChecklistRow {
     // a red 'fail' behind that no longer describes anything.
     status: actual === '' ? 'pending' : actual === row.expected.trim() ? 'pass' : 'fail',
   };
+}
+
+// Mark a row untestable. Not sticky: checkRow re-derives status from
+// whatever is in the box, so typing into a skipped row tests it again.
+export function skipRow(row: ChecklistRow): ChecklistRow {
+  return { ...row, status: 'skipped' };
+}
+
+// Is the checklist done enough to move on? Passed rows have been verified;
+// skipped rows have been judged unverifiable. Anything still pending or
+// failing is outstanding.
+export function isChecklistSettled(rows: ChecklistRow[]): boolean {
+  return rows.every((row) => row.status === 'pass' || row.status === 'skipped');
 }

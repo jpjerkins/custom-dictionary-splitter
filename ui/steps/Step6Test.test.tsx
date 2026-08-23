@@ -52,7 +52,9 @@ describe('Step6Test', () => {
     expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-fail')).not.toBeNull();
 
     fireEvent.click(screen.getByText('All entries pass, continue'));
-    expect(screen.getByTestId('test-status').textContent).toBe('Not all entries pass yet.');
+    // The gate now counts what is outstanding rather than restating the rule,
+    // and treats skipped rows as settled.
+    expect(screen.getByTestId('test-status').textContent).toBe('1 entry is still untested or failing.');
     expect(screen.getByTestId('current-step').textContent).not.toBe('sort');
 
     fireEvent.click(screen.getByText('Go back to Sort'));
@@ -121,6 +123,54 @@ describe('Step6Test', () => {
 
     fireEvent.change(box, { target: { value: '' } });
     expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-pending')).not.toBeNull();
+  });
+
+  // Some entries cannot be produced by typing at all — a Plover formatting
+  // entry like '{^`}' emits a backtick when stroked, never its own literal
+  // text. Without a way to set one aside it would block Step 7 forever.
+  test('an untestable row can be skipped, and skipping unblocks Continue', () => {
+    render(
+      <WizardProvider>
+        <Harness
+          movedEntries={[
+            { stroke: 'KAT', translation: 'cat' },
+            { stroke: 'TR-RL', translation: '{^`}' },
+          ]}
+        />
+        <CurrentStepProbe />
+      </WizardProvider>,
+    );
+    fireEvent.click(screen.getByTestId('seed'));
+
+    fireEvent.change(screen.getByLabelText('Actual translation for KAT'), { target: { value: 'cat' } });
+
+    // The formatting row can never pass, so Continue is blocked.
+    fireEvent.click(screen.getByText('All entries pass, continue'));
+    expect(screen.getByTestId('current-step').textContent).not.toBe('commit');
+    expect(screen.getByTestId('test-status').textContent).toBe('1 entry is still untested or failing.');
+
+    fireEvent.click(screen.getByLabelText('Skip TR-RL as untestable'));
+    expect(screen.getByText('TR-RL').closest('tr')?.querySelector('.status-skipped')).not.toBeNull();
+
+    fireEvent.click(screen.getByText('All entries pass, continue'));
+    expect(screen.getByTestId('current-step').textContent).toBe('commit');
+  });
+
+  test('undoing a skip re-tests against what was already typed', () => {
+    render(
+      <WizardProvider>
+        <Harness movedEntries={[{ stroke: 'KAT', translation: 'cat' }]} />
+      </WizardProvider>,
+    );
+    fireEvent.click(screen.getByTestId('seed'));
+
+    fireEvent.change(screen.getByLabelText('Actual translation for KAT'), { target: { value: 'cat' } });
+    fireEvent.click(screen.getByLabelText('Skip KAT as untestable'));
+    expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-skipped')).not.toBeNull();
+
+    // Undo must restore the PASS it already had, not drop back to pending.
+    fireEvent.click(screen.getByLabelText('Test KAT after all'));
+    expect(screen.getByText('KAT').closest('tr')?.querySelector('.status-pass')).not.toBeNull();
   });
 
   test('all rows passing advances to Commit', () => {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { buildTestChecklist, checkRow } from '../testChecklist.ts';
+import { buildTestChecklist, checkRow, skipRow, isChecklistSettled } from '../testChecklist.ts';
 import type { ChecklistRow, MovedEntry } from '../testChecklist.ts';
 import { useWizard } from '../state/WizardContext.tsx';
 
@@ -40,10 +40,23 @@ export default function Step6Test() {
     });
   }
 
+  // Toggle: un-skipping re-runs the check against whatever is in the box,
+  // rather than dropping the row back to pending and losing a result the
+  // user already typed.
+  function toggleSkip(i: number) {
+    setChecklist((prev) => {
+      const next = prev.slice();
+      next[i] = next[i].status === 'skipped' ? checkRow(next[i], next[i].actual) : skipRow(next[i]);
+      return next;
+    });
+  }
+
   function handleContinue() {
-    const allPass = checklist.every((row) => row.status === 'pass');
-    if (!allPass) {
-      setStatus('Not all entries pass yet.');
+    if (!isChecklistSettled(checklist)) {
+      const outstanding = checklist.filter((row) => row.status !== 'pass' && row.status !== 'skipped');
+      setStatus(
+        `${outstanding.length} ${outstanding.length === 1 ? 'entry is' : 'entries are'} still untested or failing.`
+      );
       return;
     }
     goToStep('commit');
@@ -59,6 +72,7 @@ export default function Step6Test() {
             <th>Expected</th>
             <th>Actual</th>
             <th>Status</th>
+            <th>Untestable</th>
           </tr>
         </thead>
         <tbody>
@@ -70,10 +84,23 @@ export default function Step6Test() {
                 <input
                   value={row.actual}
                   aria-label={`Actual translation for ${row.stroke}`}
+                  disabled={row.status === 'skipped'}
                   onChange={(e) => updateRow(i, e.target.value)}
                 />
               </td>
               <td className={`status-${row.status}`}>{row.status}</td>
+              <td>
+                <button
+                  type="button"
+                  className="btn-icon"
+                  aria-label={
+                    row.status === 'skipped' ? `Test ${row.stroke} after all` : `Skip ${row.stroke} as untestable`
+                  }
+                  onClick={() => toggleSkip(i)}
+                >
+                  {row.status === 'skipped' ? 'Undo' : 'Skip'}
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>

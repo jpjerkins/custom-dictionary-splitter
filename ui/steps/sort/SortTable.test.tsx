@@ -587,6 +587,129 @@ describe('SortTable', () => {
       expect(miscRadio.checked).toBe(false);
     });
 
+    // Abandoning the prompt by picking somewhere else must leave the word
+    // that raised it exactly as it was found — the prompt is a question, and
+    // walking away from a question is not an answer.
+    describe('abandoning the prompt', () => {
+      const twoWords: WordGroup[] = [
+        ...splitGroups,
+        {
+          word: 'ant',
+          existingChords: [],
+          newChords: [{ stroke: 'SPWANT', kind: 'new', resolution: null }],
+          destinationFile: null,
+          invariantWarning: null,
+          priorityWarning: null,
+        },
+      ];
+
+      function rowClassesFor(word: string): string[] {
+        return screen
+          .getAllByRole('row')
+          .filter((row) => within(row).queryByText(word) !== null)
+          .map((row) => row.className);
+      }
+
+      test('picking another word dismisses the prompt and reverts the trigger row', () => {
+        renderSortTable({ groups: twoWords });
+
+        // 'cat' lives in 1-personal.json, so filing it to 9-misc.json is a
+        // split and raises the prompt.
+        const catMisc = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+          (radio) => radio.getAttribute('name') === 'cat'
+        ) as HTMLInputElement;
+        fireEvent.click(catMisc);
+        expect(screen.getByRole('button', { name: 'Move all' })).toBeInTheDocument();
+
+        // Now file a different word instead, never answering the question.
+        const antMisc = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+          (radio) => radio.getAttribute('name') === 'ant'
+        ) as HTMLInputElement;
+        fireEvent.click(antMisc);
+
+        expect(screen.queryByRole('button', { name: 'Move all' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+
+        // 'cat' is back to how it was before the click: original file still
+        // selected, and no longer tinted as a decision the user made.
+        expect(catMisc.checked).toBe(false);
+        const catPersonal = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+          (radio) => radio.getAttribute('name') === 'cat'
+        ) as HTMLInputElement;
+        expect(catPersonal.checked).toBe(true);
+        for (const className of rowClassesFor('cat')) {
+          expect(className).not.toContain('word-group-row-decided');
+        }
+
+        // ...while the word actually picked is decided.
+        expect(antMisc.checked).toBe(true);
+        for (const className of rowClassesFor('ant')) {
+          expect(className).toContain('word-group-row-decided');
+        }
+      });
+
+      test('a word that was already decided stays decided when its prompt is abandoned', () => {
+        renderSortTable({ groups: twoWords });
+
+        // Decide 'cat' legitimately first (its own file — no split).
+        const catPersonal = screen.getAllByRole('radio', { name: '1-personal.json' }).find(
+          (radio) => radio.getAttribute('name') === 'cat'
+        ) as HTMLInputElement;
+        fireEvent.click(catPersonal);
+        for (const className of rowClassesFor('cat')) {
+          expect(className).toContain('word-group-row-decided');
+        }
+
+        // Raise a prompt, then abandon it. Reverting must restore the state
+        // before THAT click, not blanket-clear the word's decided status.
+        fireEvent.click(
+          screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+            (radio) => radio.getAttribute('name') === 'cat'
+          ) as HTMLInputElement
+        );
+        fireEvent.click(
+          screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+            (radio) => radio.getAttribute('name') === 'ant'
+          ) as HTMLInputElement
+        );
+
+        for (const className of rowClassesFor('cat')) {
+          expect(className).toContain('word-group-row-decided');
+        }
+        expect(catPersonal.checked).toBe(true);
+      });
+
+      test('re-picking the same word replaces the prompt but keeps the true starting state', () => {
+        renderSortTable({ groups: twoWords });
+
+        const catMisc = screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+          (radio) => radio.getAttribute('name') === 'cat'
+        ) as HTMLInputElement;
+        const catMain = screen.getAllByRole('radio', { name: '6-main.json' }).find(
+          (radio) => radio.getAttribute('name') === 'cat'
+        ) as HTMLInputElement;
+
+        fireEvent.click(catMisc);
+        // 6-main.json is protected/disabled, so bounce off 9-misc and back:
+        // raise the prompt twice for the same word.
+        fireEvent.click(catMisc);
+        expect(catMain).toBeDisabled();
+        expect(screen.getByRole('button', { name: 'Move all' })).toBeInTheDocument();
+
+        // Abandon it. The second prompt must have carried the ORIGINAL
+        // "was not decided" forward, not the value after the first click.
+        fireEvent.click(
+          screen.getAllByRole('radio', { name: '9-misc.json' }).find(
+            (radio) => radio.getAttribute('name') === 'ant'
+          ) as HTMLInputElement
+        );
+
+        for (const className of rowClassesFor('cat')) {
+          expect(className).not.toContain('word-group-row-decided');
+        }
+      });
+    });
+
     test('split anyway files the new chord without moving the existing ones', () => {
       renderSortTable({ groups: splitGroups });
 

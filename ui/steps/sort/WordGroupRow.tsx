@@ -141,13 +141,17 @@ export default function WordGroupRow({
                       value={file}
                       disabled={isProtected}
                       checked={!isProtected && group.destinationFile === file}
-                      onChange={() => onSelectDestination(group.word, file)}
-                      // onClick, not onChange: clicking the radio that is
-                      // already checked fires no change event, so confirming
-                      // the app's suggestion would otherwise be invisible.
-                      // Fires alongside onChange on a genuine change too;
-                      // marking a word decided twice is a no-op.
-                      onClick={() => onUserAction(group.word)}
+                      // onClick is the ONLY handler, deliberately. Two
+                      // reasons: onChange never fires when the user clicks
+                      // the option already checked (so confirming the app's
+                      // suggestion would be invisible), and having both fire
+                      // for one click means whichever runs second still sees
+                      // the pre-update splitPrompt in its closure and would
+                      // clobber the prompt the first one just set.
+                      // onChange is present but empty only to satisfy
+                      // React's controlled-input contract.
+                      onChange={() => {}}
+                      onClick={() => onSelectDestination(group.word, file)}
                     />
                   </td>
                 );

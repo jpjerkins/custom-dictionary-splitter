@@ -263,15 +263,48 @@ export default function SortTable({
   // Set when a radio pick would split a word across files (it already has
   // chords in some OTHER file): offers "move all" (POST /api/move-word) vs
   // "split anyway" (just file the new chord there, leave the rest where it is).
-  const [splitPrompt, setSplitPrompt] = useState<{ word: string; toFile: string; fromFiles: string[] } | null>(null);
+  const [splitPrompt, setSplitPrompt] = useState<{
+    word: string;
+    toFile: string;
+    fromFiles: string[];
+    // Whether the word was already green BEFORE the click that raised this
+    // prompt. Abandoning the prompt has to restore that exact state — see
+    // revertSplitPrompt. Nothing else needs capturing: the pick is
+    // deliberately not applied while the prompt is up, so destinationFile
+    // (and with it the radio) is still untouched.
+    wasDecided: boolean;
+  } | null>(null);
   const [moveStatus, setMoveStatus] = useState('');
+
+  // The split prompt is a question. Picking somewhere else instead of
+  // answering it must leave the word that raised it exactly as it was
+  // found, rather than stranding a stale prompt above a row that looks
+  // decided but has had nothing applied to it.
+  function revertSplitPrompt(pending: NonNullable<typeof splitPrompt>) {
+    if (!pending.wasDecided) {
+      setDecidedWords((prev) => {
+        if (!prev.has(pending.word)) return prev;
+        const next = new Set(prev);
+        next.delete(pending.word);
+        return next;
+      });
+    }
+    setSplitPrompt(null);
+    setMoveStatus('');
+  }
 
   // Called only from genuine user interaction — never from a component's
   // mount effect. ConflictResolver in particular fires its onChange once on
   // mount to report an auto-preselected override, which is a suggestion,
   // not a decision; that's why it has a separate onUserChoice callback and
   // why handleResolveChord below does NOT mark the word decided.
+  //
+  // Acting on any OTHER word also abandons a pending split prompt. Note
+  // handleSelectDestination does NOT route through here — it owns the
+  // prompt's whole lifecycle itself, because two handlers both writing
+  // splitPrompt from the same click would race on a stale closure value.
   function markDecided(word: string) {
+    if (splitPrompt && splitPrompt.word !== word) revertSplitPrompt(splitPrompt);
     setDecidedWords((prev) => (prev.has(word) ? prev : new Set(prev).add(word)));
   }
 
@@ -298,18 +331,39 @@ export default function SortTable({
     setGroups((prev) => prev.map((group) => (group.word === word ? { ...group, destinationFile: file } : group)));
   }
 
+  // Reached from a radio's onClick — not onChange, which does not fire when
+  // the user clicks the option that is already checked (confirming the
+  // app's suggestion has to count as a decision). This is the single entry
+  // point for filing a word: it owns marking the word decided AND the split
+  // prompt's whole lifecycle, so nothing else writes splitPrompt on the
+  // same click.
   function handleSelectDestination(word: string, file: string) {
-    // Reached only from a radio's onChange, so the intent is unambiguous —
-    // mark it decided even if the split prompt below defers the actual
-    // filing, since the user has still engaged with this word.
-    markDecided(word);
+    const pending = splitPrompt;
+    // Re-picking the same word replaces its prompt rather than starting a
+    // fresh one, so the ORIGINAL "was it decided before any of this" has to
+    // carry forward — reading decidedWords now would see the previous
+    // click's own mark and make the revert a no-op.
+    const wasDecided = pending?.word === word ? pending.wasDecided : decidedWords.has(word);
+
+    if (pending) {
+      // A prompt belonging to a different word is abandoned, and that word
+      // goes back to how it was. One for this same word is simply retired;
+      // the branch below decides whether a new one replaces it.
+      if (pending.word !== word) revertSplitPrompt(pending);
+      else {
+        setSplitPrompt(null);
+        setMoveStatus('');
+      }
+    }
+
+    setDecidedWords((prev) => (prev.has(word) ? prev : new Set(prev).add(word)));
+
     const group = groups.find((g) => g.word === word);
     const existingFiles = group ? Array.from(new Set(group.existingChords.map((c) => c.file))) : [];
     // Only prompt when the word already lives somewhere else — picking the
     // same file it's already in, or a first-time word, is never a split.
     if (existingFiles.length > 0 && !existingFiles.includes(file)) {
-      setMoveStatus('');
-      setSplitPrompt({ word, toFile: file, fromFiles: existingFiles });
+      setSplitPrompt({ word, toFile: file, fromFiles: existingFiles, wasDecided });
       return;
     }
     applyDestination(word, file);

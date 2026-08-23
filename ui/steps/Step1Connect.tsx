@@ -6,8 +6,19 @@ import { useWizard } from '../state/WizardContext.tsx';
 // and last-dictionary fallback exactly.
 const USER_DICTIONARY_CANDIDATES = ['user_dictionary', 'user'];
 
+// 1-indexed labels matching the step headings, for the resume prompt.
+const STEP_LABELS: Record<string, string> = {
+  connect: '1 (Connect)',
+  diff: '2 (Diff)',
+  sort: '3 (Sort)',
+  empty: '4 (Empty)',
+  flash: '5 (Flash)',
+  test: '6 (Test)',
+  commit: '7 (Commit)',
+};
+
 export default function Step1Connect() {
-  const { setState, goToStep } = useWizard();
+  const { setState, goToStep, pendingResume, resume, discardResume } = useWizard();
   const [status, setStatus] = useState('');
 
   async function handleConnect() {
@@ -36,6 +47,25 @@ export default function Step1Connect() {
   return (
     <section className="panel">
       <h2 style={{ marginTop: 0 }}>1. Connect &amp; Download</h2>
+      {pendingResume && (
+        // Offered, not applied automatically: from Step 4 on, the keyboard's
+        // user dictionary has been emptied, so a reload used to strand
+        // entries that exist only on disk with no device left to
+        // re-download them from. Resuming is usually right — but it must
+        // still be possible to start a clean run.
+        <div className="resume-prompt" role="alertdialog" aria-label="Resume previous session?">
+          <p>
+            Resume where you left off? {(pendingResume.state.movedEntries as unknown[]).length} entries saved,
+            was on Step {STEP_LABELS[pendingResume.currentStep] ?? pendingResume.currentStep}.
+          </p>
+          <button type="button" className="btn" onClick={resume}>
+            Resume
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={discardResume}>
+            Start fresh
+          </button>
+        </div>
+      )}
       <p>
         <button className="btn" type="button" onClick={handleConnect}>
           Connect keyboard

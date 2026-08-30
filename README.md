@@ -39,5 +39,11 @@ Local wizard for moving new steno entries from a Starboard keyboard
 
 ## Development
 
+`npm run dev:all` starts the backend (`npm start`, port 4173) and the
+Vite dev server (`npm run dev`, port 5173) together, with `/api`
+proxied from Vite to the backend. Use `http://localhost:5173` while
+developing the UI for hot reload; `npm start` alone still serves the
+built app at `http://localhost:4173`.
+
 `node --test` runs the full test suite (pure logic and API routes;
 Web Serial code requires real hardware and is verified manually).
